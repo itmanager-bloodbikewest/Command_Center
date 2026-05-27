@@ -654,8 +654,6 @@ function MainApp({ session, onLogout }) {
       {isDispatcher&&view!=="newcall"&&view!=="detail"&&(
         <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,display:"flex",paddingLeft:8,flexShrink:0}}>
           <NavBtn v="log">RUN LOG</NavBtn>
-          <NavBtn v="db-pending">📋 PENDING CALLS{pendingDB.length>0&&<span style={{marginLeft:6,background:C.orange,color:"#000",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{pendingDB.length}</span>}</NavBtn>
-          <NavBtn v="db-complete">✓ COMPLETED CALLS{completedDB.length>0&&<span style={{marginLeft:6,background:C.purple,color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{completedDB.length}</span>}</NavBtn>
           {dbLoading&&<div style={{marginLeft:"auto",padding:"14px 18px",fontSize:10,color:C.muted,fontFamily:"'IBM Plex Mono',monospace"}}>⟳ syncing…</div>}
         </div>
       )}
