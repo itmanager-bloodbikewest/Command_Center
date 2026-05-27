@@ -952,27 +952,54 @@ function MainApp({ session, onLogout }) {
         );
       })()}
 
-      {/* ── RIDER LIST ── */}
+{/* ── RIDER LIST ── */}
       {!isDispatcher&&view==="rider-list"&&(()=>{
-        const myRuns=pendingDB.filter(c=>{
+        const isMyRun=c=>{
           const assigned=Array.isArray(c.riders)?c.riders:typeof c.riders==="string"?[c.riders]:[];
           return assigned.length===0||assigned.some(r=>r.trim()===name.trim());
-        });
+        };
+        const myActive=pendingDB.filter(isMyRun);
+        const myCompleted=completedDB.filter(isMyRun);
+        const [riderTab,setRiderTab]=useState("active");
+        const RunCard=({c,color})=>(
+          <div key={c.id} onClick={()=>{setDetailId(c.id);setView("rider-detail");}}
+            style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"16px 20px",marginBottom:12,cursor:"pointer",opacity:c.status==="complete"?0.75:1}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor="#2a2a60"}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=C.borderHi}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:13,color:color||"#6090ff",fontWeight:600}}>{c.id}</span>
+              <Badge s={c.status}/>
+            </div>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{c.originHospital}</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:8}}>→ {c.destinationHospital}</div>
+            <div style={{fontSize:12,color:C.muted}}>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</div>
+            {c.status==="complete"&&c.completedAt&&<div style={{fontSize:11,color:C.muted,marginTop:4,fontFamily:"'IBM Plex Mono',monospace"}}>Completed {c.completedAt.slice(11,16)}</div>}
+          </div>
+        );
         return (
-          <div style={{flex:1,padding:24,overflowY:"auto"}}>
-            <div style={{fontSize:9,letterSpacing:3,color:C.muted,fontFamily:"'IBM Plex Mono',monospace",marginBottom:14}}>ACTIVE RUNS</div>
-            {myRuns.length===0&&<div style={{textAlign:"center",paddingTop:80}}><div style={{fontSize:48,marginBottom:10}}>🏍</div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:"#333"}}>NO ACTIVE RUNS</div></div>}
-            {myRuns.map(c=>(
-              <div key={c.id} onClick={()=>{setDetailId(c.id);setView("rider-detail");}}
-                style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"16px 20px",marginBottom:12,cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#2a2a60"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=C.borderHi}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:13,color:"#6090ff",fontWeight:600}}>{c.id}</span><Badge s={c.status}/></div>
-                <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{c.originHospital}</div>
-                <div style={{fontSize:13,color:C.muted,marginBottom:8}}>→ {c.destinationHospital}</div>
-                <div style={{fontSize:12,color:C.muted}}>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</div>
-              </div>
-            ))}
+          <div style={{flex:1,display:"flex",flexDirection:"column",overflowY:"hidden"}}>
+            <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,display:"flex",paddingLeft:8,flexShrink:0}}>
+              {[["active","ACTIVE RUNS",myActive.length,C.orange],["completed","COMPLETED RUNS",myCompleted.length,C.purple]].map(([tab,label,count,color])=>(
+                <button key={tab} onClick={()=>setRiderTab(tab)}
+                  style={{background:riderTab===tab?"#2060ff22":"none",border:"none",borderBottom:`2px solid ${riderTab===tab?"#2060ff":"transparent"}`,color:riderTab===tab?"#6090ff":C.muted,padding:"14px 18px",fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
+                  {label}
+                  {count>0&&<span style={{background:color,color:"#000",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{count}</span>}
+                </button>
+              ))}
+              {dbLoading&&<div style={{marginLeft:"auto",padding:"14px 18px",fontSize:10,color:C.muted,fontFamily:"'IBM Plex Mono',monospace"}}>⟳ syncing…</div>}
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:24}}>
+              {riderTab==="active"&&(
+                myActive.length===0
+                  ?<div style={{textAlign:"center",paddingTop:80}}><div style={{fontSize:48,marginBottom:10}}>🏍</div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:"#333"}}>NO ACTIVE RUNS</div></div>
+                  :myActive.map(c=><RunCard key={c.id} c={c} color="#6090ff"/>)
+              )}
+              {riderTab==="completed"&&(
+                myCompleted.length===0
+                  ?<div style={{textAlign:"center",paddingTop:80}}><div style={{fontSize:48,marginBottom:10}}>✓</div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:"#333"}}>NO COMPLETED RUNS</div></div>
+                  :myCompleted.map(c=><RunCard key={c.id} c={c} color={C.purple}/>)
+              )}
+            </div>
           </div>
         );
       })()}
