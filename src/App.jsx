@@ -81,9 +81,9 @@ const clearSession = () => localStorage.removeItem(SESSION_KEY);
 // ─── Static data ──────────────────────────────────────────────────────────────
 
 
-const nowTime = () => new Date().toTimeString().slice(0,5);
-const nowDate = () => new Date().toISOString().slice(0,10);
-const nowDT   = () => { const d=new Date(); return `${d.toISOString().slice(0,10)} ${d.toTimeString().slice(0,5)}`; };
+const nowTime = () => new Date().toLocaleTimeString("en-IE",{timeZone:"Europe/Dublin",hour:"2-digit",minute:"2-digit",hour12:false});
+const nowDate = () => new Date().toLocaleDateString("en-IE",{timeZone:"Europe/Dublin"}).split("/").reverse().join("-").replace(/(\d{4})-(\d{1,2})-(\d{1,2})/,(_,y,m,d)=>`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
+const nowDT   = () => { const d=new Date(); return `${nowDate()} ${nowTime()}`; };
 
 // Format raw Sheets values — Sheets stores dates/times as ISO strings or Date serials
 const fmtTime = (v) => {
@@ -369,8 +369,7 @@ function RiderDetail({ call:c, onBack, onPickup, onDropoff, onRiderHome, onNote 
         <div style={{marginBottom:24,display:"flex",flexDirection:"column",gap:12}}>
           {canPickup&&<button onClick={onPickup} style={{background:C.accent,border:"none",color:C.white,padding:"20px",borderRadius:12,fontSize:17,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:"0 0 30px #2060ff55"}}>⬆  PICKED UP</button>}
           {canDropoff&&<button onClick={onDropoff} style={{background:C.green,border:"none",color:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:"0 0 30px #22c55e55"}}>✓  DROPPED OFF</button>}
-          {canHome&&<button onClick={onRiderHome} style={{background:C.orange,border:"none",color:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:"0 0 30px #f59e0b55"}}>🏠  RIDER HOME</button>}
-          {c.status==="delivered"&&<div style={{background:"#1a1a28",border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"14px",textAlign:"center",color:C.muted,fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2}}>Waiting for controller to mark complete</div>}
+          {(canHome||c.riderHome)&&<button onClick={canHome?onRiderHome:undefined} disabled={!!c.riderHome} style={{background:c.riderHome?"#1a1a28":C.orange,border:`1px solid ${c.riderHome?C.borderHi:"none"}`,color:c.riderHome?C.muted:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:c.riderHome?"default":"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:c.riderHome?"none":"0 0 30px #f59e0b55"}}>🏠  RIDER HOME{c.riderHome?` — ${fmtTime(c.riderHome)}`:""}</button>}          {c.status==="delivered"&&<div style={{background:"#1a1a28",border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"14px",textAlign:"center",color:C.muted,fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2}}>Waiting for controller to mark complete</div>}
         </div>
         <Section title="Run Details">
           <InfoRow label="Origin" value={c.originHospital}/>
