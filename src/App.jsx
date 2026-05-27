@@ -1,5 +1,5 @@
 // =============================================================================
-// BLOOD BIKE WEST — CONTROL CENTRE
+// BLOOD BIKE WEST — COMMAND CENTRE
 // Phone number login + Google Sheets via Apps Script
 //
 // Environment variables (.env):
@@ -449,7 +449,7 @@ function LoginScreen({ onLogin }) {
       <div style={{textAlign:"center",marginBottom:40}}>
         <div style={{fontSize:36,marginBottom:8}}>🩸</div>
         <div style={{fontSize:20,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>BLOOD BIKE WEST</div>
-        <div style={{fontSize:10,color:C.muted,letterSpacing:4,marginTop:2}}>CONTROL CENTRE</div>
+        <div style={{fontSize:10,color:C.muted,letterSpacing:4,marginTop:2}}>COMMAND CENTRE</div>
       </div>
       <div style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:32,width:"100%",maxWidth:380}}>
         <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.7,textAlign:"center"}}>
@@ -626,7 +626,7 @@ function MainApp({ session, onLogout }) {
       <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:56,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div>
           <div style={{fontSize:14,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>🩸 BLOOD BIKE WEST</div>
-          <div style={{fontSize:8,color:C.muted,letterSpacing:4}}>CONTROL CENTRE</div>
+          <div style={{fontSize:8,color:C.muted,letterSpacing:4}}>COMMAND CENTRE</div>
         </div>
         {isDispatcher
           ? <button onClick={initiateNewCall} style={{background:C.accent,border:"none",color:C.white,padding:"9px 28px",borderRadius:7,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1}}>+ NEW CALL</button>
