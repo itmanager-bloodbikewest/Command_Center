@@ -447,7 +447,7 @@ function LoginScreen({ onLogin }) {
     <div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'IBM Plex Sans',sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
       <div style={{textAlign:"center",marginBottom:40}}>
-        <div style={{fontSize:36,marginBottom:8}}>🩸</div>
+        <img src="/logo.png" alt="Blood Bike West" style={{width:80,marginBottom:8}}/>
         <div style={{fontSize:20,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>BLOOD BIKE WEST</div>
         <div style={{fontSize:10,color:C.muted,letterSpacing:4,marginTop:2}}>COMMAND CENTRE</div>
       </div>
@@ -625,7 +625,7 @@ function MainApp({ session, onLogout }) {
       {/* Header */}
       <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:56,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div>
-          <div style={{fontSize:14,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>🩸 BLOOD BIKE WEST</div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}><img src="/logo.png" alt="" style={{width:32,height:32,objectFit:"contain"}}/><div style={{fontSize:14,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>BLOOD BIKE WEST</div></div>
           <div style={{fontSize:8,color:C.muted,letterSpacing:4}}>COMMAND CENTRE</div>
         </div>
         {isDispatcher
@@ -963,17 +963,13 @@ function MainApp({ session, onLogout }) {
         const [riderTab,setRiderTab]=useState("active");
         const RunCard=({c,color})=>(
           <div key={c.id} onClick={()=>{setDetailId(c.id);setView("rider-detail");}}
-            style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"16px 20px",marginBottom:12,cursor:"pointer",opacity:c.status==="complete"?0.75:1}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor="#2a2a60"}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=C.borderHi}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:13,color:color||"#6090ff",fontWeight:600}}>{c.id}</span>
-              <Badge s={c.status}/>
-            </div>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{c.originHospital}</div>
-            <div style={{fontSize:13,color:C.muted,marginBottom:8}}>→ {c.destinationHospital}</div>
+            style={{background:c.status==="complete"?"#111120":C.card,border:`1px solid ${c.status==="complete"?C.border:C.borderHi}`,borderRadius:10,padding:"13px 18px",marginBottom:8,cursor:"pointer",display:"grid",gridTemplateColumns:"110px 1fr 1fr auto",gap:14,alignItems:"center",opacity:c.status==="complete"?0.7:1}}
+            onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.borderColor="#2a2a60";}}
+            onMouseLeave={e=>{e.currentTarget.style.opacity=c.status==="complete"?"0.7":"1";e.currentTarget.style.borderColor=c.status==="complete"?C.border:C.borderHi;}}>
+            <div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:color||"#6090ff",marginBottom:2}}>{c.id}</div><div style={{fontSize:10,color:C.muted}}>{(c.status==="complete"?c.completedAt:c.timestamp)?.slice(11,16)||"—"}</div></div>
+            <div><div style={{fontSize:13,fontWeight:600,marginBottom:1}}>{c.originHospital}</div><div style={{fontSize:11,color:C.muted}}>→ {c.destinationHospital}</div></div>
             <div style={{fontSize:12,color:C.muted}}>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</div>
-            {c.status==="complete"&&c.completedAt&&<div style={{fontSize:11,color:C.muted,marginTop:4,fontFamily:"'IBM Plex Mono',monospace"}}>Completed {c.completedAt.slice(11,16)}</div>}
+            <Badge s={c.status}/>
           </div>
         );
         return (
