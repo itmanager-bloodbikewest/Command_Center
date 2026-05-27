@@ -125,7 +125,7 @@ const EMPTY_CALL = {
   originHospital:"", destinationHospital:"",
   itemsTransported:[], numPackages:"", riders:[], riderDutyStatus:"",
   greenLights:null, meetOtherGroup:[], vehicleUsed:"", riderCalled:"", notes:"",
-  contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"", scheduledMeetupTime:"",
+  contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"", scheduledMeetupDate:"", scheduledMeetupTime:"",
   pickupTime:"", meetupTime:"", deliveryTime:"", riderHome:"", completedAt:"",
   overrides:{}, status:"pending-pickup", id:"",
 };
@@ -830,8 +830,8 @@ function MainApp({ session, onLogout }) {
                     })}
                   </div>
                 </div>
-                <div><Label optional>Scheduled Meet-up Time</Label><input type="time" value={form.scheduledMeetupTime} onChange={e=>fset("scheduledMeetupTime",e.target.value)} style={{...inp(),width:"100%"}}/></div>
-              </div>
+                <div><Label optional>Scheduled Meet-up Date</Label><input type="date" value={form.scheduledMeetupDate||nowDate()} onChange={e=>fset("scheduledMeetupDate",e.target.value)} style={{...inp(),width:"100%"}}/></div>
+                <div><Label optional>Scheduled Meet-up Time</Label><input type="time" value={form.scheduledMeetupTime} onChange={e=>fset("scheduledMeetupTime",e.target.value)} style={{...inp(),width:"100%"}}/></div>              </div>
             </Grid>
           </Section>
 
@@ -936,13 +936,14 @@ function MainApp({ session, onLogout }) {
               <EditRow label="Duty Status" readOnly><span>{c.riderDutyStatus||"—"}</span></EditRow>
               <EditRow label="Vehicle" readOnly><span>{c.vehicleUsed||"—"}</span></EditRow>
               <EditRow label="Meet Other Group" readOnly><span>{Array.isArray(c.meetOtherGroup)?c.meetOtherGroup.join(", ")||"—":c.meetOtherGroup||"—"}</span></EditRow>
-              <EditRow label="Scheduled Meet-up" fieldKey="scheduledMeetupTime" type="time"/>
+              <EditRow label="Scheduled Meet-up Date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate}/>
+              <EditRow label="Scheduled Meet-up Time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime}/>
               <EditRow label="Green Lights" readOnly><span style={{color:c.greenLights===true?C.green:c.greenLights===false?C.red:C.muted}}>{c.greenLights===true?"✓ YES":c.greenLights===false?"✕ NO":"—"}</span></EditRow>
             </Section>
             <Section title="Timing Log">
               <TimingRow label="Rider Called"      fieldKey="riderCalled"/>
               <TimingRow label="Pickup Time"       fieldKey="pickupTime"          note="triggers on rider Picked Up"/>
-              <TimingRow label="Scheduled Meet-up" fieldKey="scheduledMeetupTime"/>
+              <EditRow label="Scheduled Meet-up" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime}/>
               <TimingRow label="Actual Meet-up"    fieldKey="meetupTime"          note="triggers on rider Dropped Off"/>
               <TimingRow label="Delivery Time"     fieldKey="deliveryTime"        note="triggers on rider Dropped Off"/>
               <TimingRow label="Rider Home"        fieldKey="riderHome"           note="triggers on rider Rider Home"/>
