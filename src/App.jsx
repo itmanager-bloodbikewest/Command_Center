@@ -960,7 +960,6 @@ function MainApp({ session, onLogout }) {
         };
         const myActive=pendingDB.filter(isMyRun);
         const myCompleted=completedDB.filter(isMyRun);
-        const [riderTab,setRiderTab]=useState("active");
         const RunCard=({c,color})=>(
           <div key={c.id} onClick={()=>{setDetailId(c.id);setView("rider-detail");}}
             style={{background:c.status==="complete"?"#111120":C.card,border:`1px solid ${c.status==="complete"?C.border:C.borderHi}`,borderRadius:10,padding:"13px 18px",marginBottom:8,cursor:"pointer",display:"grid",gridTemplateColumns:"110px 1fr 1fr auto",gap:14,alignItems:"center",opacity:c.status==="complete"?0.7:1}}
@@ -973,33 +972,31 @@ function MainApp({ session, onLogout }) {
           </div>
         );
         return (
-          <div style={{flex:1,display:"flex",flexDirection:"column",overflowY:"hidden"}}>
-            <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,display:"flex",paddingLeft:8,flexShrink:0}}>
-              {[["active","ACTIVE RUNS",myActive.length,C.orange],["completed","COMPLETED RUNS",myCompleted.length,C.purple]].map(([tab,label,count,color])=>(
-                <button key={tab} onClick={()=>setRiderTab(tab)}
-                  style={{background:riderTab===tab?"#2060ff22":"none",border:"none",borderBottom:`2px solid ${riderTab===tab?"#2060ff":"transparent"}`,color:riderTab===tab?"#6090ff":C.muted,padding:"14px 18px",fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
-                  {label}
-                  {count>0&&<span style={{background:color,color:"#000",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{count}</span>}
-                </button>
-              ))}
-              {dbLoading&&<div style={{marginLeft:"auto",padding:"14px 18px",fontSize:10,color:C.muted,fontFamily:"'IBM Plex Mono',monospace"}}>⟳ syncing…</div>}
-            </div>
-            <div style={{flex:1,overflowY:"auto",padding:24}}>
-              {riderTab==="active"&&(
-                myActive.length===0
-                  ?<div style={{textAlign:"center",paddingTop:80}}><div style={{fontSize:48,marginBottom:10}}>🏍</div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:"#333"}}>NO ACTIVE RUNS</div></div>
-                  :myActive.map(c=><RunCard key={c.id} c={c} color="#6090ff"/>)
-              )}
-              {riderTab==="completed"&&(
-                myCompleted.length===0
-                  ?<div style={{textAlign:"center",paddingTop:80}}><div style={{fontSize:48,marginBottom:10}}>✓</div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:"#333"}}>NO COMPLETED RUNS</div></div>
-                  :myCompleted.map(c=><RunCard key={c.id} c={c} color={C.purple}/>)
-              )}
-            </div>
+          <div style={{flex:1,padding:24,overflowY:"auto"}}>
+            {myActive.length===0&&myCompleted.length===0?(
+              <div style={{textAlign:"center",paddingTop:80}}>
+                <div style={{fontSize:48,marginBottom:10}}>🏍</div>
+                <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:"#333"}}>NO ACTIVE RUNS</div>
+              </div>
+            ):(
+              <>
+                {myActive.length>0&&(
+                  <>
+                    <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {myActive.length} RUN{myActive.length!==1?"S":""}</div>
+                    {myActive.map(c=><RunCard key={c.id} c={c} color="#6090ff"/>)}
+                  </>
+                )}
+                {myCompleted.length>0&&(
+                  <>
+                    <div style={{fontSize:9,letterSpacing:3,color:C.purple,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10,marginTop:24}}>COMPLETED — {myCompleted.length} RUN{myCompleted.length!==1?"S":""}</div>
+                    {myCompleted.map(c=><RunCard key={c.id} c={c} color={C.purple}/>)}
+                  </>
+                )}
+              </>
+            )}
           </div>
         );
       })()}
-
       {/* ── RIDER DETAIL ── */}
       {!isDispatcher&&view==="rider-detail"&&selectedCall&&(
         <RiderDetail
