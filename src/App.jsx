@@ -1,5 +1,5 @@
 // =============================================================================
-// BLOOD BIKE WEST — CONTROL CENTRE
+// BLOOD BIKE WEST — COMMAND CENTRE
 // Phone number login + Google Sheets via Apps Script
 //
 // Environment variables (.env):
@@ -74,16 +74,24 @@ const normalizePhone = (p) => String(p).replace(/[\s\-\(\)\+]/g, "").trim();
 
 // ─── Session helpers (localStorage) ──────────────────────────────────────────
 const SESSION_KEY = "bbw_session";
-const saveSession = (data) => localStorage.setItem(SESSION_KEY, JSON.stringify(data));
-const loadSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; } };
+const SESSION_TTL = 2 * 60 * 60 * 1000; // 2 hours in ms
+const saveSession = (data) => localStorage.setItem(SESSION_KEY, JSON.stringify({...data, savedAt: Date.now()}));
+const loadSession = () => {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY));
+    if(!s) return null;
+    if(Date.now() - s.savedAt > SESSION_TTL) { localStorage.removeItem(SESSION_KEY); return null; }
+    return s;
+  } catch { return null; }
+};
 const clearSession = () => localStorage.removeItem(SESSION_KEY);
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 
 
-const nowTime = () => new Date().toTimeString().slice(0,5);
-const nowDate = () => new Date().toISOString().slice(0,10);
-const nowDT   = () => { const d=new Date(); return `${d.toISOString().slice(0,10)} ${d.toTimeString().slice(0,5)}`; };
+const nowTime = () => new Date().toLocaleTimeString("en-IE",{timeZone:"Europe/Dublin",hour:"2-digit",minute:"2-digit",hour12:false});
+const nowDate = () => new Date().toLocaleDateString("en-IE",{timeZone:"Europe/Dublin"}).split("/").reverse().join("-").replace(/(\d{4})-(\d{1,2})-(\d{1,2})/,(_,y,m,d)=>`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
+const nowDT   = () => { const d=new Date(); return `${nowDate()} ${nowTime()}`; };
 
 // Format raw Sheets values — Sheets stores dates/times as ISO strings or Date serials
 const fmtTime = (v) => {
@@ -125,7 +133,7 @@ const EMPTY_CALL = {
   originHospital:"", destinationHospital:"",
   itemsTransported:[], numPackages:"", riders:[], riderDutyStatus:"",
   greenLights:null, meetOtherGroup:[], vehicleUsed:"", riderCalled:"", notes:"",
-  contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"", scheduledMeetupTime:"",
+  contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"", scheduledMeetupDate:"", scheduledMeetupTime:"",
   pickupTime:"", meetupTime:"", deliveryTime:"", riderHome:"", completedAt:"",
   overrides:{}, status:"pending-pickup", id:"",
 };
@@ -369,8 +377,7 @@ function RiderDetail({ call:c, onBack, onPickup, onDropoff, onRiderHome, onNote 
         <div style={{marginBottom:24,display:"flex",flexDirection:"column",gap:12}}>
           {canPickup&&<button onClick={onPickup} style={{background:C.accent,border:"none",color:C.white,padding:"20px",borderRadius:12,fontSize:17,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:"0 0 30px #2060ff55"}}>⬆  PICKED UP</button>}
           {canDropoff&&<button onClick={onDropoff} style={{background:C.green,border:"none",color:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:"0 0 30px #22c55e55"}}>✓  DROPPED OFF</button>}
-          {canHome&&<button onClick={onRiderHome} style={{background:C.orange,border:"none",color:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:"0 0 30px #f59e0b55"}}>🏠  RIDER HOME</button>}
-          {c.status==="delivered"&&<div style={{background:"#1a1a28",border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"14px",textAlign:"center",color:C.muted,fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2}}>Waiting for controller to mark complete</div>}
+          {(canHome||c.riderHome)&&<button onClick={canHome?onRiderHome:undefined} disabled={!!c.riderHome} style={{background:c.riderHome?"#1a1a28":C.orange,border:`1px solid ${c.riderHome?C.borderHi:"none"}`,color:c.riderHome?C.muted:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:c.riderHome?"default":"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:c.riderHome?"none":"0 0 30px #f59e0b55"}}>🏠  RIDER HOME{c.riderHome?` — ${fmtTime(c.riderHome)}`:""}</button>}          {c.status==="delivered"&&<div style={{background:"#1a1a28",border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"14px",textAlign:"center",color:C.muted,fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2}}>Waiting for controller to mark complete</div>}
         </div>
         <Section title="Run Details">
           <InfoRow label="Origin" value={c.originHospital}/>
@@ -447,9 +454,9 @@ function LoginScreen({ onLogin }) {
     <div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'IBM Plex Sans',sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
       <div style={{textAlign:"center",marginBottom:40}}>
-        <div style={{fontSize:36,marginBottom:8}}>🩸</div>
+        <img src="/logo.png" alt="Blood Bike West" style={{width:80,marginBottom:8}}/>
         <div style={{fontSize:20,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>BLOOD BIKE WEST</div>
-        <div style={{fontSize:10,color:C.muted,letterSpacing:4,marginTop:2}}>CONTROL CENTRE</div>
+        <div style={{fontSize:10,color:C.muted,letterSpacing:4,marginTop:2}}>COMMAND CENTRE</div>
       </div>
       <div style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:32,width:"100%",maxWidth:380}}>
         <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.7,textAlign:"center"}}>
@@ -625,8 +632,8 @@ function MainApp({ session, onLogout }) {
       {/* Header */}
       <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:56,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
         <div>
-          <div style={{fontSize:14,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>🩸 BLOOD BIKE WEST</div>
-          <div style={{fontSize:8,color:C.muted,letterSpacing:4}}>CONTROL CENTRE</div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}><img src="/logo.png" alt="" style={{width:32,height:32,objectFit:"contain"}}/><div style={{fontSize:14,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>BLOOD BIKE WEST</div></div>
+          <div style={{fontSize:8,color:C.muted,letterSpacing:4}}>COMMAND CENTRE</div>
         </div>
         {isDispatcher
           ? <button onClick={initiateNewCall} style={{background:C.accent,border:"none",color:C.white,padding:"9px 28px",borderRadius:7,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1}}>+ NEW CALL</button>
@@ -654,8 +661,6 @@ function MainApp({ session, onLogout }) {
       {isDispatcher&&view!=="newcall"&&view!=="detail"&&(
         <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,display:"flex",paddingLeft:8,flexShrink:0}}>
           <NavBtn v="log">RUN LOG</NavBtn>
-          <NavBtn v="db-pending">📋 PENDING CALLS{pendingDB.length>0&&<span style={{marginLeft:6,background:C.orange,color:"#000",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{pendingDB.length}</span>}</NavBtn>
-          <NavBtn v="db-complete">✓ COMPLETED CALLS{completedDB.length>0&&<span style={{marginLeft:6,background:C.purple,color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{completedDB.length}</span>}</NavBtn>
           {dbLoading&&<div style={{marginLeft:"auto",padding:"14px 18px",fontSize:10,color:C.muted,fontFamily:"'IBM Plex Mono',monospace"}}>⟳ syncing…</div>}
         </div>
       )}
@@ -830,8 +835,8 @@ function MainApp({ session, onLogout }) {
                     })}
                   </div>
                 </div>
-                <div><Label optional>Scheduled Meet-up Time</Label><input type="time" value={form.scheduledMeetupTime} onChange={e=>fset("scheduledMeetupTime",e.target.value)} style={{...inp(),width:"100%"}}/></div>
-              </div>
+                <div><Label optional>Scheduled Meet-up Date</Label><input type="date" value={form.scheduledMeetupDate||nowDate()} onChange={e=>fset("scheduledMeetupDate",e.target.value)} style={{...inp(),width:"100%"}}/></div>
+                <div><Label optional>Scheduled Meet-up Time</Label><input type="time" value={form.scheduledMeetupTime} onChange={e=>fset("scheduledMeetupTime",e.target.value)} style={{...inp(),width:"100%"}}/></div>              </div>
             </Grid>
           </Section>
 
@@ -936,13 +941,14 @@ function MainApp({ session, onLogout }) {
               <EditRow label="Duty Status" readOnly><span>{c.riderDutyStatus||"—"}</span></EditRow>
               <EditRow label="Vehicle" readOnly><span>{c.vehicleUsed||"—"}</span></EditRow>
               <EditRow label="Meet Other Group" readOnly><span>{Array.isArray(c.meetOtherGroup)?c.meetOtherGroup.join(", ")||"—":c.meetOtherGroup||"—"}</span></EditRow>
-              <EditRow label="Scheduled Meet-up" fieldKey="scheduledMeetupTime" type="time"/>
+              <EditRow label="Scheduled Meet-up Date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate}/>
+              <EditRow label="Scheduled Meet-up Time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime}/>
               <EditRow label="Green Lights" readOnly><span style={{color:c.greenLights===true?C.green:c.greenLights===false?C.red:C.muted}}>{c.greenLights===true?"✓ YES":c.greenLights===false?"✕ NO":"—"}</span></EditRow>
             </Section>
             <Section title="Timing Log">
               <TimingRow label="Rider Called"      fieldKey="riderCalled"/>
               <TimingRow label="Pickup Time"       fieldKey="pickupTime"          note="triggers on rider Picked Up"/>
-              <TimingRow label="Scheduled Meet-up" fieldKey="scheduledMeetupTime"/>
+              <EditRow label="Scheduled Meet-up" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime}/>
               <TimingRow label="Actual Meet-up"    fieldKey="meetupTime"          note="triggers on rider Dropped Off"/>
               <TimingRow label="Delivery Time"     fieldKey="deliveryTime"        note="triggers on rider Dropped Off"/>
               <TimingRow label="Rider Home"        fieldKey="riderHome"           note="triggers on rider Rider Home"/>
@@ -953,31 +959,51 @@ function MainApp({ session, onLogout }) {
         );
       })()}
 
-      {/* ── RIDER LIST ── */}
+{/* ── RIDER LIST ── */}
       {!isDispatcher&&view==="rider-list"&&(()=>{
-        const myRuns=pendingDB.filter(c=>{
+        const isMyRun=c=>{
           const assigned=Array.isArray(c.riders)?c.riders:typeof c.riders==="string"?[c.riders]:[];
           return assigned.length===0||assigned.some(r=>r.trim()===name.trim());
-        });
+        };
+        const myActive=pendingDB.filter(isMyRun);
+        const myCompleted=completedDB.filter(isMyRun);
+        const RunCard=({c,color})=>(
+          <div key={c.id} onClick={()=>{setDetailId(c.id);setView("rider-detail");}}
+            style={{background:c.status==="complete"?"#111120":C.card,border:`1px solid ${c.status==="complete"?C.border:C.borderHi}`,borderRadius:10,padding:"13px 18px",marginBottom:8,cursor:"pointer",display:"grid",gridTemplateColumns:"110px 1fr 1fr auto",gap:14,alignItems:"center",opacity:c.status==="complete"?0.7:1}}
+            onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.borderColor="#2a2a60";}}
+            onMouseLeave={e=>{e.currentTarget.style.opacity=c.status==="complete"?"0.7":"1";e.currentTarget.style.borderColor=c.status==="complete"?C.border:C.borderHi;}}>
+            <div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:color||"#6090ff",marginBottom:2}}>{c.id}</div><div style={{fontSize:10,color:C.muted}}>{(c.status==="complete"?c.completedAt:c.timestamp)?.slice(11,16)||"—"}</div></div>
+            <div><div style={{fontSize:13,fontWeight:600,marginBottom:1}}>{c.originHospital}</div><div style={{fontSize:11,color:C.muted}}>→ {c.destinationHospital}</div></div>
+            <div style={{fontSize:12,color:C.muted}}>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</div>
+            <Badge s={c.status}/>
+          </div>
+        );
         return (
           <div style={{flex:1,padding:24,overflowY:"auto"}}>
-            <div style={{fontSize:9,letterSpacing:3,color:C.muted,fontFamily:"'IBM Plex Mono',monospace",marginBottom:14}}>ACTIVE RUNS</div>
-            {myRuns.length===0&&<div style={{textAlign:"center",paddingTop:80}}><div style={{fontSize:48,marginBottom:10}}>🏍</div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:"#333"}}>NO ACTIVE RUNS</div></div>}
-            {myRuns.map(c=>(
-              <div key={c.id} onClick={()=>{setDetailId(c.id);setView("rider-detail");}}
-                style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"16px 20px",marginBottom:12,cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#2a2a60"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=C.borderHi}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:13,color:"#6090ff",fontWeight:600}}>{c.id}</span><Badge s={c.status}/></div>
-                <div style={{fontSize:15,fontWeight:700,marginBottom:3}}>{c.originHospital}</div>
-                <div style={{fontSize:13,color:C.muted,marginBottom:8}}>→ {c.destinationHospital}</div>
-                <div style={{fontSize:12,color:C.muted}}>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</div>
+            {myActive.length===0&&myCompleted.length===0?(
+              <div style={{textAlign:"center",paddingTop:80}}>
+                <div style={{fontSize:48,marginBottom:10}}>🏍</div>
+                <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:"#333"}}>NO ACTIVE RUNS</div>
               </div>
-            ))}
+            ):(
+              <>
+                {myActive.length>0&&(
+                  <>
+                    <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {myActive.length} RUN{myActive.length!==1?"S":""}</div>
+                    {myActive.map(c=><RunCard key={c.id} c={c} color="#6090ff"/>)}
+                  </>
+                )}
+                {myCompleted.length>0&&(
+                  <>
+                    <div style={{fontSize:9,letterSpacing:3,color:C.purple,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10,marginTop:24}}>COMPLETED — {myCompleted.length} RUN{myCompleted.length!==1?"S":""}</div>
+                    {myCompleted.map(c=><RunCard key={c.id} c={c} color={C.purple}/>)}
+                  </>
+                )}
+              </>
+            )}
           </div>
         );
       })()}
-
       {/* ── RIDER DETAIL ── */}
       {!isDispatcher&&view==="rider-detail"&&selectedCall&&(
         <RiderDetail
