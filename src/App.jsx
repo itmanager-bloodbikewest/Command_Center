@@ -1,16 +1,12 @@
 // =============================================================================
 // BLOOD BIKE WEST — COMMAND CENTRE
 // Phone number login + Google Sheets via Apps Script
-//
-// Environment variables (.env):
-//   VITE_APPS_SCRIPT_URL   ← your deployed Apps Script Web App URL
 // =============================================================================
 
 import { useState, useEffect, useCallback } from "react";
 
 const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL;
 const VAPID_KEY       = import.meta.env.VITE_FIREBASE_VAPID_KEY;
-const FCM_SENDER_ID   = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
 const FIREBASE_CONFIG = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -19,112 +15,76 @@ const FIREBASE_CONFIG = {
   appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// ─── Push notification helper ─────────────────────────────────────────────────
-// Registers the service worker, requests permission, gets FCM token,
-// and stores it in the Sheets so Apps Script can send notifications to this device.
 async function registerPushNotifications(phone) {
   try {
     if (!("serviceWorker" in navigator) || !("Notification" in window)) return;
     if (Notification.permission === "denied") return;
-
-    // Register service worker
     const reg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
-
-    // Request permission
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return;
-
-    // Dynamically import Firebase messaging (avoids loading it for non-supporting browsers)
     const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
     const { getMessaging, getToken } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js");
-
     const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
     const messaging = getMessaging(app);
-
-    const token = await getToken(messaging, {
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: reg,
-    });
-
-    if (token) {
-      // Store token in Sheets so Apps Script can target this device
-      await api("saveFcmToken", { phone, token });
-    }
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    if (token) await api("saveFcmToken", { phone, token });
   } catch (e) {
     console.warn("Push notification setup failed:", e.message);
-    // Non-fatal — app works fine without push
   }
 }
 
-// ─── API helper ───────────────────────────────────────────────────────────────
 async function api(action, payload = {}) {
   const url = new URL(APPS_SCRIPT_URL);
   url.searchParams.set("action", action);
-  if (Object.keys(payload).length > 0) {
-    url.searchParams.set("data", JSON.stringify(payload));
-  }
+  if (Object.keys(payload).length > 0) url.searchParams.set("data", JSON.stringify(payload));
   const res = await fetch(url.toString(), { method: "GET", redirect: "follow" });
   const text = await res.text();
   try { return JSON.parse(text); }
   catch { throw new Error("Invalid response: " + text.slice(0, 100)); }
 }
 
-// ─── Phone normalisation ──────────────────────────────────────────────────────
 const normalizePhone = (p) => String(p).replace(/[\s\-\(\)\+]/g, "").trim();
 
-// ─── Session helpers (localStorage) ──────────────────────────────────────────
 const SESSION_KEY = "bbw_session";
-const SESSION_TTL = 2 * 60 * 60 * 1000; // 2 hours in ms
+const SESSION_TTL = 2 * 60 * 60 * 1000;
 const saveSession = (data) => localStorage.setItem(SESSION_KEY, JSON.stringify({...data, savedAt: Date.now()}));
 const loadSession = () => {
   try {
     const s = JSON.parse(localStorage.getItem(SESSION_KEY));
-    if(!s) return null;
-    if(Date.now() - s.savedAt > SESSION_TTL) { localStorage.removeItem(SESSION_KEY); return null; }
+    if (!s) return null;
+    if (Date.now() - s.savedAt > SESSION_TTL) { localStorage.removeItem(SESSION_KEY); return null; }
     const { savedAt, ...session } = s;
     return session;
   } catch { return null; }
 };
 const clearSession = () => localStorage.removeItem(SESSION_KEY);
 
-// ─── Static data ──────────────────────────────────────────────────────────────
-
-
 const nowTime = () => new Date().toLocaleTimeString("en-IE",{timeZone:"Europe/Dublin",hour:"2-digit",minute:"2-digit",hour12:false});
 const nowDate = () => new Date().toLocaleDateString("en-IE",{timeZone:"Europe/Dublin"}).split("/").reverse().join("-").replace(/(\d{4})-(\d{1,2})-(\d{1,2})/,(_,y,m,d)=>`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
-const nowDT   = () => { const d=new Date(); return `${nowDate()} ${nowTime()}`; };
+const nowDT   = () => `${nowDate()} ${nowTime()}`;
 
-// Format raw Sheets values — Sheets stores dates/times as ISO strings or Date serials
 const fmtTime = (v) => {
-  if(!v) return "—";
+  if (!v) return "—";
   const s = String(v);
-  // Already HH:MM format
-  if(/^\d{2}:\d{2}$/.test(s)) return s;
-  // ISO datetime — extract time part
-  if(s.includes("T")) {
-    const d = new Date(s);
-    if(!isNaN(d)) return d.toTimeString().slice(0,5);
-  }
-  // "1899-12-30..." is Sheets' epoch for time-only values
-  if(s.startsWith("1899-12-30") || s.startsWith("1899-12-31")) {
-    const d = new Date(s);
-    if(!isNaN(d)) return d.toTimeString().slice(0,5);
-  }
+  if (/^\d{2}:\d{2}$/.test(s)) return s;
+  if (s.includes("T")) { const d = new Date(s); if (!isNaN(d)) return d.toLocaleTimeString("en-IE",{timeZone:"Europe/Dublin",hour:"2-digit",minute:"2-digit",hour12:false}); }
+  if (s.startsWith("1899-12-30") || s.startsWith("1899-12-31")) { const d = new Date(s); if (!isNaN(d)) return d.toLocaleTimeString("en-IE",{timeZone:"Europe/Dublin",hour:"2-digit",minute:"2-digit",hour12:false}); }
   return s.slice(0,5);
 };
 const fmtDate = (v) => {
-  if(!v) return "—";
+  if (!v) return "—";
   const s = String(v);
-  // Already YYYY-MM-DD
-  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  // ISO datetime — extract date part
-  if(s.includes("T")) return s.slice(0,10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (s.includes("T")) return s.slice(0,10);
   return s.slice(0,10);
 };
 const fmtDT = (v) => {
-  if(!v) return "—";
+  if (!v) return "—";
   const s = String(v);
-  if(s.includes("T")) return `${s.slice(0,10)} ${new Date(s).toTimeString().slice(0,5)}`;
+  if (s.includes("T") || s.includes("Z")) {
+    const d = new Date(s);
+    if (!isNaN(d)) return `${d.toLocaleDateString("en-IE",{timeZone:"Europe/Dublin"})} ${d.toLocaleTimeString("en-IE",{timeZone:"Europe/Dublin",hour:"2-digit",minute:"2-digit",hour12:false})}`;
+  }
   return s;
 };
 
@@ -134,12 +94,12 @@ const EMPTY_CALL = {
   originHospital:"", destinationHospital:"",
   itemsTransported:[], numPackages:"", riders:[], riderDutyStatus:"",
   greenLights:null, meetOtherGroup:[], vehicleUsed:"", riderCalled:"", notes:"",
-  contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"", scheduledMeetupDate:"", scheduledMeetupTime:"",
+  contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"",
+  scheduledMeetupDate:"", scheduledMeetupTime:"",
   pickupTime:"", meetupTime:"", deliveryTime:"", riderHome:"", completedAt:"",
   overrides:{}, status:"pending-pickup", id:"",
 };
 
-// ─── Colours & shared styles ──────────────────────────────────────────────────
 const C = {
   bg:"#090910", panel:"#0f0f1a", card:"#13131f", border:"#1e1e30",
   borderHi:"#2a2a42", text:"#e2e2f0", muted:"#636380", accent:"#2060ff",
@@ -154,6 +114,7 @@ const inp = (hi=false,ro=false) => ({
   outline:"none", cursor:ro?"default":"text",
 });
 const sel = {...inp(), appearance:"none", cursor:"pointer"};
+
 const Label = ({children,auto,optional,note}) => (
   <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:5}}>
     <span style={{fontSize:9,letterSpacing:2,color:C.muted,fontFamily:"'IBM Plex Mono',monospace",textTransform:"uppercase"}}>{children}</span>
@@ -243,7 +204,7 @@ const SheetTable = ({rows,emptyMsg}) => (
 );
 
 // =============================================================================
-// LOCATION FIELD — dropdown + "Add new" with fuzzy match suggestions
+// LOCATION FIELD
 // =============================================================================
 function LocationField({ label, value, onChange, options, exclude=[], onAdd }) {
   const [adding, setAdding] = useState(false);
@@ -252,22 +213,19 @@ function LocationField({ label, value, onChange, options, exclude=[], onAdd }) {
   const [confirmVal, setConfirmVal] = useState(null);
 
   useEffect(()=>{
-    if(!query.trim()){ setSuggestions([]); return; }
+    if (!query.trim()) { setSuggestions([]); return; }
     const q = query.toLowerCase();
-    const matches = options.filter(o=>o.toLowerCase().includes(q) && !exclude.includes(o));
-    setSuggestions(matches);
+    setSuggestions(options.filter(o=>o.toLowerCase().includes(q) && !exclude.includes(o)));
   },[query, options, exclude]);
 
   const handleAdd = () => {
-    const v = query.trim(); if(!v) return;
+    const v = query.trim(); if (!v) return;
     const exact = options.find(o=>o.toLowerCase()===v.toLowerCase());
-    if(exact){ onChange(exact); setAdding(false); setQuery(""); return; }
+    if (exact) { onChange(exact); setAdding(false); setQuery(""); return; }
     setConfirmVal(v);
   };
-
   const confirmAdd = () => {
-    onAdd(confirmVal);
-    onChange(confirmVal);
+    onAdd(confirmVal); onChange(confirmVal);
     setAdding(false); setQuery(""); setConfirmVal(null);
   };
 
@@ -280,10 +238,7 @@ function LocationField({ label, value, onChange, options, exclude=[], onAdd }) {
             <option value="">— Select —</option>
             {options.filter(o=>!exclude.includes(o)).map(h=><option key={h}>{h}</option>)}
           </select>
-          <button onClick={()=>setAdding(true)}
-            style={{background:C.card,border:`1px solid ${C.borderHi}`,color:C.muted,borderRadius:6,padding:"0 12px",fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",whiteSpace:"nowrap"}}>
-            + ADD
-          </button>
+          <button onClick={()=>setAdding(true)} style={{background:C.card,border:`1px solid ${C.borderHi}`,color:C.muted,borderRadius:6,padding:"0 12px",fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",whiteSpace:"nowrap"}}>+ ADD</button>
         </div>
       ) : (
         <div>
@@ -298,15 +253,9 @@ function LocationField({ label, value, onChange, options, exclude=[], onAdd }) {
           ) : (
             <div style={{position:"relative"}}>
               <div style={{display:"flex",gap:6}}>
-                <input value={query} onChange={e=>setQuery(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&handleAdd()}
-                  placeholder="Type location name…"
-                  autoFocus
-                  style={{...inp(),flex:1,width:"auto"}}/>
-                <button onClick={handleAdd}
-                  style={{background:C.accent,border:"none",color:C.white,borderRadius:6,padding:"0 12px",fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace"}}>ADD</button>
-                <button onClick={()=>{setAdding(false);setQuery("");setSuggestions([]);}}
-                  style={{background:"none",border:`1px solid ${C.borderHi}`,color:C.muted,borderRadius:6,padding:"0 10px",fontSize:11,cursor:"pointer"}}>✕</button>
+                <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAdd()} placeholder="Type location name…" autoFocus style={{...inp(),flex:1,width:"auto"}}/>
+                <button onClick={handleAdd} style={{background:C.accent,border:"none",color:C.white,borderRadius:6,padding:"0 12px",fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace"}}>ADD</button>
+                <button onClick={()=>{setAdding(false);setQuery("");setSuggestions([]);}} style={{background:"none",border:`1px solid ${C.borderHi}`,color:C.muted,borderRadius:6,padding:"0 10px",fontSize:11,cursor:"pointer"}}>✕</button>
               </div>
               {suggestions.length>0&&(
                 <div style={{position:"absolute",top:"100%",left:0,right:80,background:"#1a1a28",border:`1px solid ${C.borderHi}`,borderRadius:6,zIndex:50,marginTop:4}}>
@@ -328,7 +277,7 @@ function LocationField({ label, value, onChange, options, exclude=[], onAdd }) {
 }
 
 // =============================================================================
-// RIDER DETAIL — extracted as proper component to allow useState hooks
+// RIDER DETAIL
 // =============================================================================
 function RiderDetail({ call:c, onBack, onPickup, onDropoff, onRiderHome, onNote }) {
   const [riderNote, setRiderNote] = useState("");
@@ -353,7 +302,7 @@ function RiderDetail({ call:c, onBack, onPickup, onDropoff, onRiderHome, onNote 
   );
 
   const saveNote = () => {
-    if(!riderNote.trim()) return;
+    if (!riderNote.trim()) return;
     onNote(riderNote.trim());
     setRiderNote(""); setNoteSaved(true); setTimeout(()=>setNoteSaved(false),2000);
   };
@@ -378,7 +327,8 @@ function RiderDetail({ call:c, onBack, onPickup, onDropoff, onRiderHome, onNote 
         <div style={{marginBottom:24,display:"flex",flexDirection:"column",gap:12}}>
           {canPickup&&<button onClick={onPickup} style={{background:C.accent,border:"none",color:C.white,padding:"20px",borderRadius:12,fontSize:17,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:"0 0 30px #2060ff55"}}>⬆  PICKED UP</button>}
           {canDropoff&&<button onClick={onDropoff} style={{background:C.green,border:"none",color:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:"0 0 30px #22c55e55"}}>✓  DROPPED OFF</button>}
-          {(canHome||c.riderHome)&&<button onClick={canHome?onRiderHome:undefined} disabled={!!c.riderHome} style={{background:c.riderHome?"#1a1a28":C.orange,border:`1px solid ${c.riderHome?C.borderHi:"none"}`,color:c.riderHome?C.muted:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:c.riderHome?"default":"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:c.riderHome?"none":"0 0 30px #f59e0b55"}}>🏠  RIDER HOME{c.riderHome?` — ${fmtTime(c.riderHome)}`:""}</button>}          {c.status==="delivered"&&<div style={{background:"#1a1a28",border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"14px",textAlign:"center",color:C.muted,fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2}}>Waiting for controller to mark complete</div>}
+          {(canHome||c.riderHome)&&<button onClick={canHome?onRiderHome:undefined} disabled={!!c.riderHome} style={{background:c.riderHome?"#1a1a28":C.orange,border:`1px solid ${c.riderHome?C.borderHi:"none"}`,color:c.riderHome?C.muted:"#000",padding:"20px",borderRadius:12,fontSize:17,cursor:c.riderHome?"default":"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:2,boxShadow:c.riderHome?"none":"0 0 30px #f59e0b55"}}>🏠  RIDER HOME{c.riderHome?` — ${fmtTime(c.riderHome)}`:""}</button>}
+          {c.status==="delivered"&&<div style={{background:"#1a1a28",border:`1px solid ${C.borderHi}`,borderRadius:12,padding:"14px",textAlign:"center",color:C.muted,fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2}}>Waiting for controller to mark complete</div>}
         </div>
         <Section title="Run Details">
           <InfoRow label="Origin" value={c.originHospital}/>
@@ -436,14 +386,10 @@ function LoginScreen({ onLogin }) {
     setLoading(true); setErrMsg("");
     try {
       const res = await api("getUserRole", { phone: normalized });
-      if (!res.found) {
-        setErrMsg("Phone number not recognised. Please contact your administrator.");
-        setLoading(false); return;
-      }
+      if (!res.found) { setErrMsg("Phone number not recognised. Please contact your administrator."); setLoading(false); return; }
       const session = { phone: normalized, role: res.role, name: res.name, controllers: res.controllers||[], riders: res.riders||[] };
       saveSession(session);
       onLogin(session);
-      // Register for push notifications after login (non-blocking)
       registerPushNotifications(normalized).catch(()=>{});
     } catch(e) {
       setErrMsg("Could not connect to server. Please try again.");
@@ -460,24 +406,15 @@ function LoginScreen({ onLogin }) {
         <div style={{fontSize:10,color:C.muted,letterSpacing:4,marginTop:2}}>COMMAND CENTRE</div>
       </div>
       <div style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:32,width:"100%",maxWidth:380}}>
-        <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.7,textAlign:"center"}}>
-          Enter your phone number to sign in.
-        </div>
+        <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.7,textAlign:"center"}}>Enter your phone number to sign in.</div>
         {errMsg&&<div style={{background:"#2a1010",border:`1px solid ${C.red}`,borderRadius:7,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#ff8080"}}>{errMsg}</div>}
         <Label>Phone Number</Label>
-        <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-          placeholder="e.g. 087 123 4567"
-          style={{...inp(),width:"100%",marginBottom:14,fontSize:15}}/>
-        <button onClick={handleLogin} disabled={loading}
-          style={{width:"100%",background:loading?"#1a2a4a":C.accent,border:"none",color:C.white,padding:"13px",borderRadius:8,fontSize:13,cursor:loading?"default":"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1}}>
+        <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="e.g. 087 123 4567" style={{...inp(),width:"100%",marginBottom:14,fontSize:15}}/>
+        <button onClick={handleLogin} disabled={loading} style={{width:"100%",background:loading?"#1a2a4a":C.accent,border:"none",color:C.white,padding:"13px",borderRadius:8,fontSize:13,cursor:loading?"default":"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1}}>
           {loading?"CHECKING…":"SIGN IN"}
         </button>
       </div>
-      <div style={{marginTop:20,fontSize:11,color:"#333",textAlign:"center"}}>
-        Not registered? Contact your Blood Bike West administrator.
-      </div>
-      {/* iOS PWA install hint */}
+      <div style={{marginTop:20,fontSize:11,color:"#333",textAlign:"center"}}>Not registered? Contact your Blood Bike West administrator.</div>
       {/iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone && (
         <div style={{marginTop:20,background:"#1a1a28",border:`1px solid ${C.borderHi}`,borderRadius:10,padding:"14px 18px",maxWidth:380,width:"100%",textAlign:"center"}}>
           <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
@@ -496,29 +433,28 @@ function LoginScreen({ onLogin }) {
 // =============================================================================
 function MainApp({ session, onLogout }) {
   const { role, name, controllers, riders } = session;
-  const [dash, setDash]         = useState(role==="rider"?"rider":"dispatcher");
-  const [view, setView]         = useState(role==="rider"?"rider-list":"log");
+  const [dash, setDash]               = useState(role==="rider"?"rider":"dispatcher");
+  const [view, setView]               = useState(role==="rider"?"rider-list":"log");
   const [pendingDB, setPendingDB]     = useState([]);
   const [completedDB, setCompletedDB] = useState([]);
-  const [form, setForm]         = useState({...EMPTY_CALL});
+  const [form, setForm]               = useState({...EMPTY_CALL});
   const [hospitals,    setHospitals]    = useState([]);
   const [vehicles,     setVehicles]     = useState([]);
   const [meetups,      setMeetups]      = useState([]);
   const [itemPicklist, setItems]        = useState([]);
   const [dutyStatuses, setDutyStatuses] = useState([]);
-  const [itemQuery, setItemQ]   = useState("");
-  const [itemSugg,  setItemSugg] = useState([]);
-  const [confirmItem, setCI]    = useState(null);
-  const [detailId,  setDetailId] = useState(null);
-  const [toast,     setToast]   = useState(null);
+  const [itemQuery,  setItemQ]    = useState("");
+  const [itemSugg,   setItemSugg] = useState([]);
+  const [confirmItem, setCI]      = useState(null);
+  const [detailId,   setDetailId] = useState(null);
+  const [toast,      setToast]    = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
-  const [dbLoading, setDbLoading] = useState(false);
+  const [dbLoading,  setDbLoading] = useState(false);
 
   const notify = (msg,color=C.green) => { setToast({msg,color}); setTimeout(()=>setToast(null),3000); };
   const allCalls = [...pendingDB,...completedDB];
-  const selectedCall = allCalls.find(c=>c.id===detailId)||null;
+  const selectedCall = allCalls.find(x=>x.id===detailId)||null;
 
-  // Load picklists
   useEffect(()=>{
     api("getLists").then(res=>{
       if(res.hospitals)    setHospitals(res.hospitals);
@@ -529,7 +465,6 @@ function MainApp({ session, onLogout }) {
     }).catch(()=>{});
   },[]);
 
-  // Load calls
   const loadCalls = useCallback(async()=>{
     setDbLoading(true);
     try {
@@ -544,8 +479,8 @@ function MainApp({ session, onLogout }) {
   useEffect(()=>{ const t=setInterval(loadCalls,30000); return ()=>clearInterval(t); },[loadCalls]);
 
   const patchCall = async(id,patch)=>{
-    setPendingDB(prev=>prev.map(c=>c.id===id?{...c,...patch}:c));
-    setCompletedDB(prev=>prev.map(c=>c.id===id?{...c,...patch}:c));
+    setPendingDB(prev=>prev.map(x=>x.id===id?{...x,...patch}:x));
+    setCompletedDB(prev=>prev.map(x=>x.id===id?{...x,...patch}:x));
     try { await api("updateCall",{id,...patch}); }
     catch(e){ notify("Sync error — saved locally",C.orange); }
   };
@@ -606,9 +541,9 @@ function MainApp({ session, onLogout }) {
   const triggerRiderHome = id => { patchCall(id,{riderHome:nowTime()}); notify("Rider home recorded"); };
 
   const markComplete = async(id) => {
-    const call=pendingDB.find(c=>c.id===id); if(!call) return;
+    const call=pendingDB.find(x=>x.id===id); if(!call) return;
     const completedAt=nowDT();
-    setPendingDB(prev=>prev.filter(c=>c.id!==id));
+    setPendingDB(prev=>prev.filter(x=>x.id!==id));
     setCompletedDB(prev=>[{...call,status:"complete",completedAt},...prev]);
     setConfirmComplete(false); setView("log");
     notify(`${id} → Completed`,C.purple);
@@ -624,6 +559,25 @@ function MainApp({ session, onLogout }) {
     </button>
   );
 
+  // Mobile-friendly run card used in both controller and rider log
+  const RunCard = ({rc, color, onClickView}) => (
+    <div onClick={onClickView}
+      style={{background:rc.status==="complete"?"#111120":C.card,border:`1px solid ${rc.status==="complete"?C.border:C.borderHi}`,borderRadius:10,padding:"13px 18px",marginBottom:8,cursor:"pointer",opacity:rc.status==="complete"?0.7:1}}
+      onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.borderColor="#2a2a60";}}
+      onMouseLeave={e=>{e.currentTarget.style.opacity=rc.status==="complete"?"0.7":"1";e.currentTarget.style.borderColor=rc.status==="complete"?C.border:C.borderHi;}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:color||"#6090ff"}}>{rc.id}</div>
+        <Badge s={rc.status}/>
+      </div>
+      <div style={{fontSize:14,fontWeight:600,marginBottom:2}}>{rc.originHospital} <span style={{color:C.muted,fontWeight:400}}>→</span> {rc.destinationHospital}</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
+        <div style={{fontSize:11,color:C.muted}}>{Array.isArray(rc.itemsTransported)?rc.itemsTransported.join(", "):rc.itemsTransported||"—"}</div>
+        <div style={{fontSize:11,color:C.muted,textAlign:"right"}}>{Array.isArray(rc.riders)?rc.riders.join(", "):rc.riders||"—"}</div>
+      </div>
+      <div style={{fontSize:10,color:C.muted,marginTop:4,fontFamily:"'IBM Plex Mono',monospace"}}>{fmtDT(rc.status==="complete"?rc.completedAt:rc.timestamp)}</div>
+    </div>
+  );
+
   return (
     <div style={{fontFamily:"'IBM Plex Sans',sans-serif",background:C.bg,minHeight:"100vh",color:C.text,display:"flex",flexDirection:"column"}}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -631,28 +585,28 @@ function MainApp({ session, onLogout }) {
       {toast&&<div style={{position:"fixed",top:16,right:16,background:toast.color,color:"#fff",padding:"10px 20px",borderRadius:7,fontSize:13,zIndex:9999,boxShadow:"0 4px 24px #0009",fontFamily:"'IBM Plex Mono',monospace"}}>{toast.msg}</div>}
 
       {/* Header */}
-      <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:56,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-        <div>
-          <div style={{display:"flex",alignItems:"center",gap:10}}><img src="/logo.png" alt="" style={{width:32,height:32,objectFit:"contain"}}/><div style={{fontSize:14,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white}}>BLOOD BIKE WEST</div></div>
-          <div style={{fontSize:8,color:C.muted,letterSpacing:4}}>COMMAND CENTRE</div>
+      <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,padding:"0 16px",height:56,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          <img src="/logo.png" alt="" style={{width:32,height:32,objectFit:"contain",flexShrink:0}}/>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.white,whiteSpace:"nowrap"}}>BLOOD BIKE WEST</div>
+            <div style={{fontSize:8,color:C.muted,letterSpacing:3}}>COMMAND CENTRE</div>
+          </div>
         </div>
-        {isDispatcher
-          ? <button onClick={initiateNewCall} style={{background:C.accent,border:"none",color:C.white,padding:"9px 28px",borderRadius:7,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1}}>+ NEW CALL</button>
-          : <div/>
-        }
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
+        {isDispatcher&&<button onClick={initiateNewCall} style={{background:C.accent,border:"none",color:C.white,padding:"8px 14px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1,flexShrink:0}}>+ NEW CALL</button>}
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
           {role==="controller"&&(
             <div style={{display:"flex",background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:3,gap:3}}>
-              {[["dispatcher","CONTROLLER"],["rider","RIDER"]].map(([d,label])=>(
+              {[["dispatcher","CTL"],["rider","RDR"]].map(([d,label])=>(
                 <button key={d} onClick={()=>{setDash(d);setView(d==="dispatcher"?"log":"rider-list");}}
-                  style={{background:dash===d?"#2060ff":"transparent",color:dash===d?C.white:C.muted,border:"none",borderRadius:6,padding:"6px 14px",fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,fontWeight:600}}>
+                  style={{background:dash===d?"#2060ff":"transparent",color:dash===d?C.white:C.muted,border:"none",borderRadius:6,padding:"6px 10px",fontSize:10,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,fontWeight:600}}>
                   {label}
                 </button>
               ))}
             </div>
           )}
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:11,color:C.text}}>{name}</div>
+            <div style={{fontSize:11,color:C.text,maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
             <button onClick={()=>{clearSession();onLogout();}} style={{background:"none",border:"none",color:C.muted,fontSize:10,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",padding:0,letterSpacing:1}}>SIGN OUT</button>
           </div>
         </div>
@@ -668,7 +622,7 @@ function MainApp({ session, onLogout }) {
 
       {/* ── RUN LOG ── */}
       {isDispatcher&&view==="log"&&(
-        <div style={{flex:1,padding:24,overflowY:"auto"}}>
+        <div style={{flex:1,padding:16,overflowY:"auto"}}>
           {pendingDB.length===0&&completedDB.length===0?(
             <div style={{textAlign:"center",paddingTop:80}}>
               <div style={{fontSize:48,marginBottom:12}}>📋</div>
@@ -680,35 +634,13 @@ function MainApp({ session, onLogout }) {
               {pendingDB.length>0&&(
                 <>
                   <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {pendingDB.length} RUN{pendingDB.length!==1?"S":""}</div>
-                  {pendingDB.map(c=>(
-                    <div key={c.id} onClick={()=>{setDetailId(c.id);setView("detail");}}
-                      style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:10,padding:"13px 18px",marginBottom:8,cursor:"pointer",display:"grid",gridTemplateColumns:"110px 1fr 1fr 1fr auto",gap:14,alignItems:"center"}}
-                      onMouseEnter={e=>e.currentTarget.style.borderColor="#2a2a60"}
-                      onMouseLeave={e=>e.currentTarget.style.borderColor=C.borderHi}>
-                      <div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:"#6090ff",marginBottom:2}}>{c.id}</div><div style={{fontSize:10,color:C.muted}}>{c.timestamp?.slice(11)||"—"}</div></div>
-                      <div><div style={{fontSize:13,fontWeight:600,marginBottom:1}}>{c.originHospital}</div><div style={{fontSize:11,color:C.muted}}>→ {c.destinationHospital}</div></div>
-                      <div style={{fontSize:12,color:C.muted}}>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</div>
-                      <div style={{fontSize:12}}>{Array.isArray(c.riders)?c.riders.join(", "):c.riders||"—"}</div>
-                      <Badge s={c.status}/>
-                    </div>
-                  ))}
+                  {pendingDB.map(rc=><RunCard key={rc.id} rc={rc} color="#6090ff" onClickView={()=>{setDetailId(rc.id);setView("detail");}}/>)}
                 </>
               )}
               {completedDB.length>0&&(
                 <>
                   <div style={{fontSize:9,letterSpacing:3,color:C.purple,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10,marginTop:24}}>COMPLETED — {completedDB.length} RUN{completedDB.length!==1?"S":""}</div>
-                  {completedDB.map(c=>(
-                    <div key={c.id} onClick={()=>{setDetailId(c.id);setView("detail");}}
-                      style={{background:"#111120",border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 18px",marginBottom:8,cursor:"pointer",display:"grid",gridTemplateColumns:"110px 1fr 1fr 1fr auto",gap:14,alignItems:"center",opacity:0.7}}
-                      onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.borderColor="#3a2a5a";}}
-                      onMouseLeave={e=>{e.currentTarget.style.opacity="0.7";e.currentTarget.style.borderColor=C.border;}}>
-                      <div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:C.purple,marginBottom:2}}>{c.id}</div><div style={{fontSize:10,color:C.muted}}>{c.completedAt?.slice(11)||"—"}</div></div>
-                      <div><div style={{fontSize:13,fontWeight:600,marginBottom:1}}>{c.originHospital}</div><div style={{fontSize:11,color:C.muted}}>→ {c.destinationHospital}</div></div>
-                      <div style={{fontSize:12,color:C.muted}}>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</div>
-                      <div style={{fontSize:12}}>{Array.isArray(c.riders)?c.riders.join(", "):c.riders||"—"}</div>
-                      <Badge s={c.status}/>
-                    </div>
-                  ))}
+                  {completedDB.map(rc=><RunCard key={rc.id} rc={rc} color={C.purple} onClickView={()=>{setDetailId(rc.id);setView("detail");}}/>)}
                 </>
               )}
             </>
@@ -716,29 +648,9 @@ function MainApp({ session, onLogout }) {
         </div>
       )}
 
-      {/* ── DB VIEWS ── */}
-      {isDispatcher&&view==="db-pending"&&(
-        <div style={{flex:1,overflowY:"auto",padding:24}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-            <div><div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:4}}>DATABASE — SHEET 1</div><div style={{fontSize:18,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace"}}>📋 Pending Calls</div><div style={{fontSize:11,color:C.muted,marginTop:2}}>Live records for calls in transit.</div></div>
-            <div style={{textAlign:"right"}}><div style={{fontSize:28,fontWeight:700,color:C.orange,fontFamily:"'IBM Plex Mono',monospace"}}>{pendingDB.length}</div><div style={{fontSize:10,color:C.muted,letterSpacing:1}}>ACTIVE</div></div>
-          </div>
-          <div style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:10,overflow:"hidden"}}><SheetTable rows={pendingDB} emptyMsg="NO PENDING CALLS"/></div>
-        </div>
-      )}
-      {isDispatcher&&view==="db-complete"&&(
-        <div style={{flex:1,overflowY:"auto",padding:24}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-            <div><div style={{fontSize:9,letterSpacing:3,color:C.purple,fontFamily:"'IBM Plex Mono',monospace",marginBottom:4}}>DATABASE — SHEET 2</div><div style={{fontSize:18,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace"}}>✓ Completed Calls</div><div style={{fontSize:11,color:C.muted,marginTop:2}}>Archived on Mark Complete.</div></div>
-            <div style={{textAlign:"right"}}><div style={{fontSize:28,fontWeight:700,color:C.purple,fontFamily:"'IBM Plex Mono',monospace"}}>{completedDB.length}</div><div style={{fontSize:10,color:C.muted,letterSpacing:1}}>COMPLETED</div></div>
-          </div>
-          <div style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:10,overflow:"hidden"}}><SheetTable rows={completedDB} emptyMsg="NO COMPLETED CALLS YET"/></div>
-        </div>
-      )}
-
       {/* ── NEW CALL FORM ── */}
       {isDispatcher&&view==="newcall"&&(
-        <div style={{flex:1,overflowY:"auto",padding:24,maxWidth:920,margin:"0 auto",width:"100%"}}>
+        <div style={{flex:1,overflowY:"auto",padding:16,maxWidth:920,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
           {confirmItem&&(
             <div style={{background:"#14281a",border:`1px solid ${C.green}`,borderRadius:8,padding:"12px 16px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{fontSize:13}}>Add <strong>"{confirmItem}"</strong> to the picklist?</span>
@@ -751,44 +663,28 @@ function MainApp({ session, onLogout }) {
           <div style={{fontSize:10,color:C.muted,fontFamily:"'IBM Plex Mono',monospace",letterSpacing:2,marginBottom:18}}>NEW CALL — * REQUIRED FIELDS</div>
 
           <Section title="Call Metadata">
-            <Grid cols={3}>
+            <Grid cols={2}>
               <div><Label auto>Timestamp</Label><input value={form.timestamp} readOnly style={{...inp(false,true),width:"100%"}}/></div>
               <div><Label>Time of Call from Hospital *</Label><input type="time" value={form.timeOfCall} onChange={e=>fset("timeOfCall",e.target.value)} style={{...inp(),width:"100%"}}/></div>
               <div><Label note="defaults to today">Date of Call from Hospital</Label><input type="date" value={form.dateOfCallFromHospital} onChange={e=>fset("dateOfCallFromHospital",e.target.value)} style={{...inp(),width:"100%"}}/></div>
               <div><Label>Controller Name *</Label>
                 <select value={form.controllerName} onChange={e=>fset("controllerName",e.target.value)} style={{...sel,width:"100%"}}>
                   <option value="">— Select —</option>
-                  {controllers.map(c=><option key={c.name||c}>{c.name||c}</option>)}
+                  {controllers.map(ctrl=><option key={ctrl.name||ctrl}>{ctrl.name||ctrl}</option>)}
                 </select>
               </div>
               <div><Label>Transport Date *</Label><input type="date" value={form.transportDate} onChange={e=>fset("transportDate",e.target.value)} style={{...inp(),width:"100%"}}/></div>
               <div>
-                <Label auto note="syncs to transport date — click to edit">Date Call Received</Label>
-                <input type="date" value={form.dateCallReceived}
-                  onChange={e=>fset("dateCallReceived",e.target.value)}
-                  style={{...inp(),width:"100%",cursor:"text"}}/>
+                <Label auto note="syncs to transport date">Date Call Received</Label>
+                <input type="date" value={form.dateCallReceived} onChange={e=>fset("dateCallReceived",e.target.value)} style={{...inp(),width:"100%"}}/>
               </div>
             </Grid>
           </Section>
 
           <Section title="Route">
-            <Grid cols={2}>
-              <LocationField
-                label="Origin *"
-                value={form.originHospital}
-                onChange={v=>fset("originHospital",v)}
-                options={hospitals}
-                exclude={[form.destinationHospital]}
-                onAdd={v=>{ setHospitals(p=>[...p,v].sort()); api("addToList",{sheet:"OriginDestination",value:v}).catch(()=>{}); notify(`"${v}" added to Origins`); }}
-              />
-              <LocationField
-                label="Destination *"
-                value={form.destinationHospital}
-                onChange={v=>fset("destinationHospital",v)}
-                options={hospitals}
-                exclude={[form.originHospital]}
-                onAdd={v=>{ setHospitals(p=>[...p,v].sort()); api("addToList",{sheet:"OriginDestination",value:v}).catch(()=>{}); notify(`"${v}" added to Destinations`); }}
-              />
+            <Grid cols={1}>
+              <LocationField label="Origin *" value={form.originHospital} onChange={v=>fset("originHospital",v)} options={hospitals} exclude={[form.destinationHospital]} onAdd={v=>{ setHospitals(p=>[...p,v].sort()); api("addToList",{sheet:"OriginDestination",value:v}).catch(()=>{}); notify(`"${v}" added`); }}/>
+              <LocationField label="Destination *" value={form.destinationHospital} onChange={v=>fset("destinationHospital",v)} options={hospitals} exclude={[form.originHospital]} onAdd={v=>{ setHospitals(p=>[...p,v].sort()); api("addToList",{sheet:"OriginDestination",value:v}).catch(()=>{}); notify(`"${v}" added`); }}/>
             </Grid>
           </Section>
 
@@ -813,31 +709,31 @@ function MainApp({ session, onLogout }) {
           </Section>
 
           <Section title="Crew & Vehicle">
-            <Grid cols={2} gap={16}>
-              <div>
-                <Label>Rider *</Label>
+            <Grid cols={1} gap={12}>
+              <div><Label>Rider *</Label>
                 <select value={form.riders[0]||""} onChange={e=>fset("riders",e.target.value?[e.target.value]:[])} style={{...sel,width:"100%"}}>
                   <option value="">— Select Rider —</option>
                   {riders.map(r=><option key={r.name||r}>{r.name||r}</option>)}
                 </select>
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                <div><Label>Rider Duty Status</Label><select value={form.riderDutyStatus} onChange={e=>fset("riderDutyStatus",e.target.value)} style={{...sel,width:"100%"}}><option value="">— Select —</option>{dutyStatuses.map(s=><option key={s}>{s}</option>)}</select></div>
-                <div><Label>Vehicle Used *</Label><select value={form.vehicleUsed} onChange={e=>fset("vehicleUsed",e.target.value)} style={{...sel,width:"100%"}}><option value="">— Select Vehicle —</option>{vehicles.map(v=><option key={v}>{v}</option>)}</select></div>
-                <div>
-                  <Label>Meet with Other Group</Label>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:4}}>
-                    {meetups.map(g=>{
-                      const active=Array.isArray(form.meetOtherGroup)&&form.meetOtherGroup.includes(g);
-                      return <Chip key={g} active={active} onClick={()=>{
-                        const cur=Array.isArray(form.meetOtherGroup)?form.meetOtherGroup:[];
-                        fset("meetOtherGroup",active?cur.filter(x=>x!==g):[...cur,g]);
-                      }}>{active?"✓ ":""}{g}</Chip>;
-                    })}
-                  </div>
+              <div><Label>Rider Duty Status</Label><select value={form.riderDutyStatus} onChange={e=>fset("riderDutyStatus",e.target.value)} style={{...sel,width:"100%"}}><option value="">— Select —</option>{dutyStatuses.map(s=><option key={s}>{s}</option>)}</select></div>
+              <div><Label>Vehicle Used *</Label><select value={form.vehicleUsed} onChange={e=>fset("vehicleUsed",e.target.value)} style={{...sel,width:"100%"}}><option value="">— Select Vehicle —</option>{vehicles.map(v=><option key={v}>{v}</option>)}</select></div>
+              <div>
+                <Label>Meet with Other Group</Label>
+                <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:4}}>
+                  {meetups.map(g=>{
+                    const active=Array.isArray(form.meetOtherGroup)&&form.meetOtherGroup.includes(g);
+                    return <Chip key={g} active={active} onClick={()=>{
+                      const cur=Array.isArray(form.meetOtherGroup)?form.meetOtherGroup:[];
+                      fset("meetOtherGroup",active?cur.filter(x=>x!==g):[...cur,g]);
+                    }}>{active?"✓ ":""}{g}</Chip>;
+                  })}
                 </div>
+              </div>
+              <Grid cols={2}>
                 <div><Label optional>Scheduled Meet-up Date</Label><input type="date" value={form.scheduledMeetupDate||nowDate()} onChange={e=>fset("scheduledMeetupDate",e.target.value)} style={{...inp(),width:"100%"}}/></div>
-                <div><Label optional>Scheduled Meet-up Time</Label><input type="time" value={form.scheduledMeetupTime} onChange={e=>fset("scheduledMeetupTime",e.target.value)} style={{...inp(),width:"100%"}}/></div>              </div>
+                <div><Label optional>Scheduled Meet-up Time</Label><input type="time" value={form.scheduledMeetupTime} onChange={e=>fset("scheduledMeetupTime",e.target.value)} style={{...inp(),width:"100%"}}/></div>
+              </Grid>
             </Grid>
           </Section>
 
@@ -849,7 +745,7 @@ function MainApp({ session, onLogout }) {
           </Section>
 
           <Section title="Optional Details">
-            <Grid cols={2} gap={14}>
+            <Grid cols={1} gap={12}>
               <div><Label optional>Contact Name</Label><input value={form.contactName} onChange={e=>fset("contactName",e.target.value)} placeholder="Name of contact" style={{...inp(),width:"100%"}}/></div>
               <div><Label optional>Contact Phone Number</Label><input type="tel" value={form.contactPhone} onChange={e=>fset("contactPhone",e.target.value)} placeholder="+353…" style={{...inp(),width:"100%"}}/></div>
               <div><Label optional>Pick-up Address</Label><input value={form.pickupAddress} onChange={e=>fset("pickupAddress",e.target.value)} placeholder="Street address / dept" style={{...inp(),width:"100%"}}/></div>
@@ -858,7 +754,7 @@ function MainApp({ session, onLogout }) {
           </Section>
 
           <Section title="Timing — Auto-Captured (Override Available)">
-            <Grid cols={3}>
+            <Grid cols={2}>
               <AutoTime label="Rider Called" value={form.riderCalled} fieldKey="riderCalled" overrides={form.overrides} onOverride={handleOverride} note="auto on New Call"/>
               <AutoTime label="Pickup Time" value={form.pickupTime} fieldKey="pickupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Picked Up"/>
               <AutoTime label="Meet-up Time (actual)" value={form.meetupTime} fieldKey="meetupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Dropped Off"/>
@@ -880,55 +776,55 @@ function MainApp({ session, onLogout }) {
 
       {/* ── DISPATCHER DETAIL ── */}
       {isDispatcher&&view==="detail"&&selectedCall&&(()=>{
-        const c=selectedCall;
-        const isCompleted=c.status==="complete";
+        const sc=selectedCall;
+        const isCompleted=sc.status==="complete";
         const EditRow=({label,fieldKey,type="text",children,readOnly:ro=false,fmt})=>{
           const [editing,setEditing]=useState(false);
-          const [val,setVal]=useState(c[fieldKey]||"");
-          useEffect(()=>setVal(c[fieldKey]||""),[c[fieldKey]]);
-          const save=()=>{patchField(c.id,fieldKey,val);setEditing(false);notify("Saved","#2060ff");};
-          if(children||ro) return <div style={{display:"flex",gap:12,padding:"9px 0",borderBottom:`1px solid ${C.border}`,alignItems:"center"}}><div style={{width:200,fontSize:10,color:C.muted,letterSpacing:1,fontFamily:"'IBM Plex Mono',monospace",flexShrink:0}}>{label.toUpperCase()}</div><div style={{fontSize:13,color:C.text,flex:1}}>{children||(fmt?fmt(c[fieldKey]):c[fieldKey])||"—"}</div></div>;
+          const [val,setVal]=useState(sc[fieldKey]||"");
+          useEffect(()=>setVal(sc[fieldKey]||""),[sc[fieldKey]]);
+          const save=()=>{patchField(sc.id,fieldKey,val);setEditing(false);notify("Saved","#2060ff");};
+          if(children||ro) return <div style={{display:"flex",gap:12,padding:"9px 0",borderBottom:`1px solid ${C.border}`,alignItems:"center"}}><div style={{width:160,fontSize:10,color:C.muted,letterSpacing:1,fontFamily:"'IBM Plex Mono',monospace",flexShrink:0}}>{label.toUpperCase()}</div><div style={{fontSize:13,color:C.text,flex:1}}>{children||(fmt?fmt(sc[fieldKey]):sc[fieldKey])||"—"}</div></div>;
           return <div style={{display:"flex",gap:12,padding:"9px 0",borderBottom:`1px solid ${C.border}`,alignItems:"center"}}>
-            <div style={{width:200,fontSize:10,color:C.muted,letterSpacing:1,fontFamily:"'IBM Plex Mono',monospace",flexShrink:0}}>{label.toUpperCase()}</div>
+            <div style={{width:160,fontSize:10,color:C.muted,letterSpacing:1,fontFamily:"'IBM Plex Mono',monospace",flexShrink:0}}>{label.toUpperCase()}</div>
             {editing
               ?<div style={{display:"flex",gap:6,flex:1}}><input type={type} value={type==="date"?fmtDate(val):type==="time"?fmtTime(val):val} onChange={e=>setVal(e.target.value)} autoFocus style={{...inp(true),flex:1,width:"auto"}} onKeyDown={e=>{if(e.key==="Enter")save();if(e.key==="Escape")setEditing(false);}}/><button onClick={save} style={{background:C.green,color:"#000",border:"none",borderRadius:5,padding:"0 12px",cursor:"pointer",fontSize:11,fontFamily:"'IBM Plex Mono',monospace"}}>SAVE</button><button onClick={()=>setEditing(false)} style={{background:"none",border:`1px solid ${C.borderHi}`,color:C.muted,borderRadius:5,padding:"0 10px",cursor:"pointer",fontSize:11}}>✕</button></div>
               :<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:13,color:val?C.text:C.muted}}>{fmt?fmt(val):val||"—"}</span>{!isCompleted&&<button onClick={()=>setEditing(true)} style={{background:"none",border:`1px solid ${C.borderHi}`,color:C.muted,borderRadius:5,padding:"3px 10px",cursor:"pointer",fontSize:10,fontFamily:"'IBM Plex Mono',monospace"}}>✎ edit</button>}</div>}
           </div>;
         };
         const TimingRow=({label,fieldKey,note})=>{
-          const val=allCalls.find(x=>x.id===c.id)?.[fieldKey]||"";
+          const val=allCalls.find(x=>x.id===sc.id)?.[fieldKey]||"";
           const [ov,setOv]=useState(false);
           const [ovVal,setOvVal]=useState(val);
           useEffect(()=>setOvVal(val),[val]);
-          const saveOv=()=>{patchField(c.id,fieldKey,ovVal);setOv(false);notify("Override saved","#2060ff");};
+          const saveOv=()=>{patchField(sc.id,fieldKey,ovVal);setOv(false);notify("Override saved","#2060ff");};
           return <div style={{display:"flex",gap:12,padding:"9px 0",borderBottom:`1px solid ${C.border}`,alignItems:"center"}}>
-            <div style={{width:200,fontSize:10,color:C.muted,letterSpacing:1,fontFamily:"'IBM Plex Mono',monospace",flexShrink:0}}>{label.toUpperCase()}</div>
+            <div style={{width:160,fontSize:10,color:C.muted,letterSpacing:1,fontFamily:"'IBM Plex Mono',monospace",flexShrink:0}}>{label.toUpperCase()}</div>
             {ov?<div style={{display:"flex",gap:6,flex:1}}><input type="time" value={ovVal} onChange={e=>setOvVal(e.target.value)} autoFocus style={{...inp(true),width:120}}/><button onClick={saveOv} style={{background:C.green,color:"#000",border:"none",borderRadius:5,padding:"0 12px",cursor:"pointer",fontSize:11,fontFamily:"'IBM Plex Mono',monospace"}}>SAVE</button><button onClick={()=>setOv(false)} style={{background:"none",border:`1px solid ${C.borderHi}`,color:C.muted,borderRadius:5,padding:"0 10px",cursor:"pointer",fontSize:11}}>✕</button></div>
             :<div style={{display:"flex",alignItems:"center",gap:10,flex:1}}><span style={{fontSize:14,fontWeight:600,fontFamily:"'IBM Plex Mono',monospace",color:val?C.text:"#2a2a40"}}>{val?fmtTime(val):"pending…"}</span>{val&&<span style={{fontSize:9,color:C.green,background:C.green+"22",padding:"1px 6px",borderRadius:8}}>RECORDED</span>}{note&&!val&&<span style={{fontSize:9,color:C.muted,fontStyle:"italic"}}>{note}</span>}{!isCompleted&&<button onClick={()=>setOv(true)} style={{marginLeft:"auto",background:"none",border:`1px solid ${C.borderHi}`,color:C.muted,borderRadius:5,padding:"3px 10px",cursor:"pointer",fontSize:10,fontFamily:"'IBM Plex Mono',monospace"}}>✎ override</button>}</div>}
           </div>;
         };
         return (
-          <div style={{flex:1,overflowY:"auto",padding:24,maxWidth:900,margin:"0 auto",width:"100%"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-              <div><button onClick={()=>setView("log")} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",padding:0,marginBottom:6}}>← BACK TO LOG</button><div style={{fontSize:22,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace",color:isCompleted?C.purple:"#6090ff"}}>{c.id}</div><div style={{marginTop:6}}><Badge s={c.status}/></div>{isCompleted&&<div style={{fontSize:11,color:C.muted,marginTop:4}}>Completed {c.completedAt}</div>}</div>
+          <div style={{flex:1,overflowY:"auto",padding:16,maxWidth:900,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,gap:12}}>
+              <div><button onClick={()=>setView("log")} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",padding:0,marginBottom:6}}>← BACK TO LOG</button><div style={{fontSize:22,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace",color:isCompleted?C.purple:"#6090ff"}}>{sc.id}</div><div style={{marginTop:6}}><Badge s={sc.status}/></div>{isCompleted&&<div style={{fontSize:11,color:C.muted,marginTop:4}}>Completed {sc.completedAt}</div>}</div>
               {!isCompleted&&(!confirmComplete
-                ?<button onClick={()=>setConfirmComplete(true)} style={{background:C.purple,border:"none",color:C.white,padding:"10px 20px",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1,boxShadow:`0 0 20px ${C.purple}44`}}>✓ MARK TRANSPORT COMPLETE</button>
-                :<div style={{background:"#1a1028",border:`1px solid ${C.purple}`,borderRadius:10,padding:"14px 18px",textAlign:"center",minWidth:260}}><div style={{fontSize:12,color:C.text,marginBottom:10,fontFamily:"'IBM Plex Mono',monospace"}}>Move to Completed Calls?</div><div style={{fontSize:11,color:C.muted,marginBottom:14}}>This will archive the record.</div><div style={{display:"flex",gap:8}}><button onClick={()=>markComplete(c.id)} style={{flex:1,background:C.purple,border:"none",color:C.white,padding:"8px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700}}>CONFIRM</button><button onClick={()=>setConfirmComplete(false)} style={{flex:1,background:"none",border:`1px solid ${C.borderHi}`,color:C.muted,padding:"8px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace"}}>CANCEL</button></div></div>
+                ?<button onClick={()=>setConfirmComplete(true)} style={{background:C.purple,border:"none",color:C.white,padding:"10px 16px",borderRadius:8,fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1,boxShadow:`0 0 20px ${C.purple}44`,flexShrink:0}}>✓ MARK COMPLETE</button>
+                :<div style={{background:"#1a1028",border:`1px solid ${C.purple}`,borderRadius:10,padding:"14px 18px",textAlign:"center",minWidth:200}}><div style={{fontSize:12,color:C.text,marginBottom:10,fontFamily:"'IBM Plex Mono',monospace"}}>Move to Completed Calls?</div><div style={{fontSize:11,color:C.muted,marginBottom:14}}>This will archive the record.</div><div style={{display:"flex",gap:8}}><button onClick={()=>markComplete(sc.id)} style={{flex:1,background:C.purple,border:"none",color:C.white,padding:"8px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700}}>CONFIRM</button><button onClick={()=>setConfirmComplete(false)} style={{flex:1,background:"none",border:`1px solid ${C.borderHi}`,color:C.muted,padding:"8px",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace"}}>CANCEL</button></div></div>
               )}
             </div>
             <Section title="Call Metadata">
-              <EditRow label="Timestamp" readOnly><span>{fmtDT(c.timestamp)}</span></EditRow>
+              <EditRow label="Timestamp" readOnly><span>{fmtDT(sc.timestamp)}</span></EditRow>
               <EditRow label="Time of Call" fieldKey="timeOfCall" type="time" fmt={fmtTime}/>
-              <EditRow label="Date of Call from Hospital" fieldKey="dateOfCallFromHospital" type="date" fmt={fmtDate}/>
+              <EditRow label="Date of Call" fieldKey="dateOfCallFromHospital" type="date" fmt={fmtDate}/>
               <EditRow label="Controller" fieldKey="controllerName"/>
               <EditRow label="Transport Date" fieldKey="transportDate" type="date" fmt={fmtDate}/>
               <EditRow label="Date Call Received" fieldKey="dateCallReceived" type="date" fmt={fmtDate}/>
-              <EditRow label="Rider Called" readOnly><span style={{fontFamily:"'IBM Plex Mono',monospace"}}>{fmtTime(c.riderCalled)}</span></EditRow>
+              <EditRow label="Rider Called" readOnly><span style={{fontFamily:"'IBM Plex Mono',monospace"}}>{fmtTime(sc.riderCalled)}</span></EditRow>
             </Section>
             <Section title="Route">
-              <EditRow label="Origin Hospital" readOnly><span>{c.originHospital}</span></EditRow>
-              <EditRow label="Destination Hospital" readOnly><span>{c.destinationHospital}</span></EditRow>
-              <EditRow label="Items" readOnly><span>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</span></EditRow>
+              <EditRow label="Origin" readOnly><span>{sc.originHospital}</span></EditRow>
+              <EditRow label="Destination" readOnly><span>{sc.destinationHospital}</span></EditRow>
+              <EditRow label="Items" readOnly><span>{Array.isArray(sc.itemsTransported)?sc.itemsTransported.join(", "):sc.itemsTransported||"—"}</span></EditRow>
               <EditRow label="No. of Packages" fieldKey="numPackages" type="number"/>
               <EditRow label="Pick-up Address" fieldKey="pickupAddress"/>
               <EditRow label="Drop-off Address" fieldKey="dropOffAddress"/>
@@ -938,49 +834,38 @@ function MainApp({ session, onLogout }) {
               <EditRow label="Contact Phone" fieldKey="contactPhone" type="tel"/>
             </Section>
             <Section title="Crew & Vehicle">
-              <EditRow label="Rider(s)" readOnly><span>{Array.isArray(c.riders)?c.riders.join(", "):c.riders||"—"}</span></EditRow>
-              <EditRow label="Duty Status" readOnly><span>{c.riderDutyStatus||"—"}</span></EditRow>
-              <EditRow label="Vehicle" readOnly><span>{c.vehicleUsed||"—"}</span></EditRow>
-              <EditRow label="Meet Other Group" readOnly><span>{Array.isArray(c.meetOtherGroup)?c.meetOtherGroup.join(", ")||"—":c.meetOtherGroup||"—"}</span></EditRow>
-              <EditRow label="Scheduled Meet-up Date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate}/>
-              <EditRow label="Scheduled Meet-up Time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime}/>
-              <EditRow label="Green Lights" readOnly><span style={{color:c.greenLights===true?C.green:c.greenLights===false?C.red:C.muted}}>{c.greenLights===true?"✓ YES":c.greenLights===false?"✕ NO":"—"}</span></EditRow>
+              <EditRow label="Rider(s)" readOnly><span>{Array.isArray(sc.riders)?sc.riders.join(", "):sc.riders||"—"}</span></EditRow>
+              <EditRow label="Duty Status" readOnly><span>{sc.riderDutyStatus||"—"}</span></EditRow>
+              <EditRow label="Vehicle" readOnly><span>{sc.vehicleUsed||"—"}</span></EditRow>
+              <EditRow label="Meet Other Group" readOnly><span>{Array.isArray(sc.meetOtherGroup)?sc.meetOtherGroup.join(", ")||"—":sc.meetOtherGroup||"—"}</span></EditRow>
+              <EditRow label="Meet-up Date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate}/>
+              <EditRow label="Meet-up Time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime}/>
+              <EditRow label="Green Lights" readOnly><span style={{color:sc.greenLights===true?C.green:sc.greenLights===false?C.red:C.muted}}>{sc.greenLights===true?"✓ YES":sc.greenLights===false?"✕ NO":"—"}</span></EditRow>
             </Section>
             <Section title="Timing Log">
-              <TimingRow label="Rider Called"      fieldKey="riderCalled"/>
-              <TimingRow label="Pickup Time"       fieldKey="pickupTime"          note="triggers on rider Picked Up"/>
-              <EditRow label="Scheduled Meet-up" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime}/>
-              <TimingRow label="Actual Meet-up"    fieldKey="meetupTime"          note="triggers on rider Dropped Off"/>
-              <TimingRow label="Delivery Time"     fieldKey="deliveryTime"        note="triggers on rider Dropped Off"/>
-              <TimingRow label="Rider Home"        fieldKey="riderHome"           note="triggers on rider Rider Home"/>
+              <TimingRow label="Rider Called"   fieldKey="riderCalled"/>
+              <TimingRow label="Pickup Time"    fieldKey="pickupTime"    note="triggers on rider Picked Up"/>
+              <EditRow   label="Scheduled Meet-up" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime}/>
+              <TimingRow label="Actual Meet-up" fieldKey="meetupTime"    note="triggers on rider Dropped Off"/>
+              <TimingRow label="Delivery Time"  fieldKey="deliveryTime"  note="triggers on rider Dropped Off"/>
+              <TimingRow label="Rider Home"     fieldKey="riderHome"     note="triggers on rider Rider Home"/>
               {isCompleted&&<TimingRow label="Completed At" fieldKey="completedAt"/>}
             </Section>
-            {c.notes&&<Section title="Notes"><div style={{fontSize:13,color:"#c7c7d0",lineHeight:1.8}}>{c.notes}</div></Section>}
+            {sc.notes&&<Section title="Notes"><div style={{fontSize:13,color:"#c7c7d0",lineHeight:1.8}}>{sc.notes}</div></Section>}
           </div>
         );
       })()}
 
-{/* ── RIDER LIST ── */}
+      {/* ── RIDER LIST ── */}
       {!isDispatcher&&view==="rider-list"&&(()=>{
-        const isMyRun=c=>{
-          const assigned=Array.isArray(c.riders)?c.riders:typeof c.riders==="string"?[c.riders]:[];
+        const isMyRun=rc=>{
+          const assigned=Array.isArray(rc.riders)?rc.riders:typeof rc.riders==="string"?[rc.riders]:[];
           return assigned.length===0||assigned.some(r=>r.trim()===name.trim());
         };
         const myActive=pendingDB.filter(isMyRun);
         const myCompleted=completedDB.filter(isMyRun);
-        const RunCard=({c,color})=>(
-          <div key={c.id} onClick={()=>{setDetailId(c.id);setView("rider-detail");}}
-            style={{background:c.status==="complete"?"#111120":C.card,border:`1px solid ${c.status==="complete"?C.border:C.borderHi}`,borderRadius:10,padding:"13px 18px",marginBottom:8,cursor:"pointer",display:"grid",gridTemplateColumns:"110px 1fr 1fr auto",gap:14,alignItems:"center",opacity:c.status==="complete"?0.7:1}}
-            onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.borderColor="#2a2a60";}}
-            onMouseLeave={e=>{e.currentTarget.style.opacity=c.status==="complete"?"0.7":"1";e.currentTarget.style.borderColor=c.status==="complete"?C.border:C.borderHi;}}>
-            <div><div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,color:color||"#6090ff",marginBottom:2}}>{c.id}</div><div style={{fontSize:10,color:C.muted}}>{(c.status==="complete"?c.completedAt:c.timestamp)?.slice(11,16)||"—"}</div></div>
-            <div><div style={{fontSize:13,fontWeight:600,marginBottom:1}}>{c.originHospital}</div><div style={{fontSize:11,color:C.muted}}>→ {c.destinationHospital}</div></div>
-            <div style={{fontSize:12,color:C.muted}}>{Array.isArray(c.itemsTransported)?c.itemsTransported.join(", "):c.itemsTransported||"—"}</div>
-            <Badge s={c.status}/>
-          </div>
-        );
         return (
-          <div style={{flex:1,padding:24,overflowY:"auto"}}>
+          <div style={{flex:1,padding:16,overflowY:"auto"}}>
             {myActive.length===0&&myCompleted.length===0?(
               <div style={{textAlign:"center",paddingTop:80}}>
                 <div style={{fontSize:48,marginBottom:10}}>🏍</div>
@@ -991,13 +876,13 @@ function MainApp({ session, onLogout }) {
                 {myActive.length>0&&(
                   <>
                     <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {myActive.length} RUN{myActive.length!==1?"S":""}</div>
-                    {myActive.map(c=><RunCard key={c.id} c={c} color="#6090ff"/>)}
+                    {myActive.map(rc=><RunCard key={rc.id} rc={rc} color="#6090ff" onClickView={()=>{setDetailId(rc.id);setView("rider-detail");}}/>)}
                   </>
                 )}
                 {myCompleted.length>0&&(
                   <>
                     <div style={{fontSize:9,letterSpacing:3,color:C.purple,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10,marginTop:24}}>COMPLETED — {myCompleted.length} RUN{myCompleted.length!==1?"S":""}</div>
-                    {myCompleted.map(c=><RunCard key={c.id} c={c} color={C.purple}/>)}
+                    {myCompleted.map(rc=><RunCard key={rc.id} rc={rc} color={C.purple} onClickView={()=>{setDetailId(rc.id);setView("rider-detail");}}/>)}
                   </>
                 )}
               </>
@@ -1005,6 +890,7 @@ function MainApp({ session, onLogout }) {
           </div>
         );
       })()}
+
       {/* ── RIDER DETAIL ── */}
       {!isDispatcher&&view==="rider-detail"&&selectedCall&&(
         <RiderDetail
@@ -1032,21 +918,20 @@ export default function App() {
 
   useEffect(()=>{
     const saved = loadSession();
-    if(saved) {
+    if (saved) {
       setSession(saved);
-      // Re-register push on session restore (token may have rotated)
       registerPushNotifications(saved.phone).catch(()=>{});
     }
     setChecking(false);
   },[]);
 
-  if(checking) return (
+  if (checking) return (
     <div style={{background:"#090910",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'IBM Plex Mono',monospace",color:"#636380",fontSize:12,letterSpacing:2}}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet"/>
       LOADING…
     </div>
   );
 
-  if(!session) return <LoginScreen onLogin={setSession}/>;
+  if (!session) return <LoginScreen onLogin={setSession}/>;
   return <MainApp session={session} onLogout={()=>setSession(null)}/>;
 }
