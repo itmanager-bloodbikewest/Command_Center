@@ -932,6 +932,7 @@ export default function App() {
     </div>
   );
 
-  if (!session) return <LoginScreen onLogin={setSession}/>;
+ if (!session) return <LoginScreen onLogin={setSession}/>;
+console.log("SESSION:", JSON.stringify(session));
   return <MainApp session={session} onLogout={()=>setSession(null)}/>;
 }
