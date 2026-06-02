@@ -81,7 +81,8 @@ const loadSession = () => {
     const s = JSON.parse(localStorage.getItem(SESSION_KEY));
     if(!s) return null;
     if(Date.now() - s.savedAt > SESSION_TTL) { localStorage.removeItem(SESSION_KEY); return null; }
-    return s;
+    const { savedAt, ...session } = s;
+    return session;
   } catch { return null; }
 };
 const clearSession = () => localStorage.removeItem(SESSION_KEY);
