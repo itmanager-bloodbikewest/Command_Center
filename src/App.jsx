@@ -670,7 +670,7 @@ function MainApp({ session, onLogout }) {
               <div><Label>Controller Name *</Label>
                 <select value={form.controllerName} onChange={e=>fset("controllerName",e.target.value)} style={{...sel,width:"100%"}}>
                   <option value="">— Select —</option>
-                  {controllers.map(ctrl=><option key={ctrl.name||ctrl}>{ctrl.name||ctrl}</option>)}
+                  {controllers.map((ctrl,i)=><option key={i}>{String(ctrl.name||ctrl)}</option>)}
                 </select>
               </div>
               <div><Label>Transport Date *</Label><input type="date" value={form.transportDate} onChange={e=>fset("transportDate",e.target.value)} style={{...inp(),width:"100%"}}/></div>
@@ -713,7 +713,7 @@ function MainApp({ session, onLogout }) {
               <div><Label>Rider *</Label>
                 <select value={form.riders[0]||""} onChange={e=>fset("riders",e.target.value?[e.target.value]:[])} style={{...sel,width:"100%"}}>
                   <option value="">— Select Rider —</option>
-                  {riders.map(r=><option key={r.name||r}>{r.name||r}</option>)}
+                  {riders.map((r,i)=><option key={i}>{String(r.name||r)}</option>)}
                 </select>
               </div>
               <div><Label>Rider Duty Status</Label><select value={form.riderDutyStatus} onChange={e=>fset("riderDutyStatus",e.target.value)} style={{...sel,width:"100%"}}><option value="">— Select —</option>{dutyStatuses.map(s=><option key={s}>{s}</option>)}</select></div>
@@ -933,6 +933,5 @@ export default function App() {
   );
 
  if (!session) return <LoginScreen onLogin={setSession}/>;
-console.log("SESSION:", JSON.stringify(session));
   return <MainApp session={session} onLogout={()=>setSession(null)}/>;
 }
