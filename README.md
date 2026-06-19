@@ -1,16 +1,58 @@
-# React + Vite
+# Blood Bike West — Command Centre
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React + Vite web app for logging and tracking Blood Bike West transport runs.
+Controllers/dispatchers log calls and manage the run log; riders see their assigned
+runs and record pickup/dropoff/home times. Data is stored in Google Sheets via a
+Google Apps Script web app; push notifications use Firebase Cloud Messaging.
 
-Currently, two official plugins are available:
+## Tech stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 + Vite
+- Google Apps Script backend (Google Sheets as the data store)
+- Firebase Cloud Messaging (push notifications)
+- Deployed on Netlify
 
-## React Compiler
+## Local development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+Create a `.env` file based on `.env.example` and fill in the values:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```
+VITE_APPS_SCRIPT_URL=...        # the Apps Script web-app URL (backend)
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_VAPID_KEY=...
+```
+
+## Build
+
+```bash
+npm run build      # outputs to dist/
+npm run preview    # preview the production build locally
+```
+
+## Deployment
+
+Deployed on Netlify (config in `netlify.toml`). The `main` branch serves
+production; the `dev` branch is a separate preview deploy. Environment variables
+are set per deploy context in the Netlify dashboard.
+
+## Project structure
+
+```
+src/
+  App.jsx            Root: theme provider + session gate
+  MainApp.jsx        App state, data loading, layout, view routing
+  constants.js       Shared data constants
+  lib/               api, datetime, session, theme (pure modules)
+  ui/                Shared UI primitives
+  components/        Reusable components (LoginScreen, RunCard, etc.)
+  views/             Screen-level views (log, new-call form, detail, rider list)
+```

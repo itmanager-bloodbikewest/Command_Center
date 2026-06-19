@@ -1,0 +1,17 @@
+# Netlify build + serving configuration
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Single-page app: serve index.html for client-side routes.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Preserved from the previous Firebase hosting config so popup sign-in keeps working.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
