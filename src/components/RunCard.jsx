@@ -26,7 +26,7 @@ export function RunCard({ rc, color, onClickView }) {
 
 const groupLabel = (C, color, top) => ({ fontSize: 9, letterSpacing: 3, color, fontFamily: "'IBM Plex Mono',monospace", marginBottom: 10, ...(top ? { marginTop: 24 } : {}) });
 
-// Active + completed run sections, shared by the dispatcher log and rider list.
+// Active + completed run sections, shared by the run log and rider list.
 export function RunGroups({ active, completed, onOpen }) {
   const C = useC();
   return (

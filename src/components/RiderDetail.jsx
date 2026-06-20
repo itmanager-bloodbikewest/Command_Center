@@ -81,7 +81,7 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
           <TimeRow C={C} label="Delivered" val={c.deliveryTime} />
           <TimeRow C={C} label="Rider Home" val={c.riderHome} />
         </Section>
-        {c.notes && <Section title="Dispatcher Notes"><div style={{ fontSize: 13, color: C.text, lineHeight: 1.8, whiteSpace: "pre-line" }}>{c.notes}</div></Section>}
+        {c.notes && <Section title="Controller Notes"><div style={{ fontSize: 13, color: C.text, lineHeight: 1.8, whiteSpace: "pre-line" }}>{c.notes}</div></Section>}
         <Section title="Add Note">
           <Label optional>Visible to controller</Label>
           <textarea value={riderNote} onChange={(e) => setRiderNote(e.target.value)} rows={3}

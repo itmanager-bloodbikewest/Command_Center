@@ -5,7 +5,7 @@ import { clearSession } from "./lib/session.js";
 import { nowTime, nowDate, nowDT } from "./lib/datetime.js";
 import { EMPTY_CALL, REQUIRED_CALL_FIELDS } from "./constants.js";
 
-import DispatcherLog from "./views/DispatcherLog.jsx";
+import RunLog from "./views/RunLog.jsx";
 import NewCallForm from "./views/NewCallForm.jsx";
 import CallDetail from "./views/CallDetail.jsx";
 import RiderList from "./views/RiderList.jsx";
@@ -22,7 +22,7 @@ export default function MainApp({ session, onLogout }) {
   const C = useC();
   const { role, name, controllers, riders } = session;
 
-  const [dash, setDash] = useState(role === "rider" ? "rider" : "dispatcher");
+  const [dash, setDash] = useState(role === "rider" ? "rider" : "control");
   const [view, setView] = useState(role === "rider" ? "rider-list" : "log");
   const [pendingDB, setPendingDB] = useState([]);
   const [completedDB, setCompletedDB] = useState([]);
@@ -145,7 +145,7 @@ export default function MainApp({ session, onLogout }) {
     catch { notify("Complete saved locally — sync error", C.orange); }
   };
 
-  const isDispatcher = dash === "dispatcher";
+  const isControl = dash === "control";
 
   const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
 
@@ -170,12 +170,12 @@ export default function MainApp({ session, onLogout }) {
             <div style={{ fontSize: 8, color: C.muted, letterSpacing: 3 }}>COMMAND CENTRE</div>
           </div>
         </div>
-        {isDispatcher && <button onClick={initiateNewCall} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>+ NEW CALL</button>}
+        {isControl && <button onClick={initiateNewCall} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>+ NEW CALL</button>}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {role === "controller" && (
+          {role === "dual user" && (
             <div style={{ display: "flex", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, gap: 3 }}>
-              {[["dispatcher", "CTL"], ["rider", "RDR"]].map(([d, label]) => (
-                <button key={d} onClick={() => { setDash(d); setView(d === "dispatcher" ? "log" : "rider-list"); }}
+              {[["control", "CTL"], ["rider", "RDR"]].map(([d, label]) => (
+                <button key={d} onClick={() => { setDash(d); setView(d === "control" ? "log" : "rider-list"); }}
                   style={{ background: dash === d ? C.accent : "transparent", color: dash === d ? "#fff" : C.muted, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, fontWeight: 600 }}>
                   {label}
                 </button>
@@ -189,19 +189,19 @@ export default function MainApp({ session, onLogout }) {
         </div>
       </div>
 
-      {/* Dispatcher sub-nav */}
-      {isDispatcher && view !== "newcall" && view !== "detail" && (
+      {/* Control sub-nav */}
+      {isControl && view !== "newcall" && view !== "detail" && (
         <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, display: "flex", paddingLeft: 8, flexShrink: 0 }}>
           <NavBtn v="log" view={view} setView={setView} C={C}>RUN LOG</NavBtn>
           {dbLoading && <div style={{ marginLeft: "auto", padding: "14px 18px", fontSize: 10, color: C.muted, fontFamily: "'IBM Plex Mono',monospace" }}>⟳ syncing…</div>}
         </div>
       )}
 
-      {isDispatcher && view === "log" && (
-        <DispatcherLog pending={pendingDB} completed={completedDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} />
+      {isControl && view === "log" && (
+        <RunLog pending={pendingDB} completed={completedDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} />
       )}
 
-      {isDispatcher && view === "newcall" && (
+      {isControl && view === "newcall" && (
         <NewCallForm
           form={form} fset={fset} ftog={ftog} handleOverride={handleOverride}
           lists={lists} onAddLocation={onAddLocation}
@@ -211,7 +211,7 @@ export default function MainApp({ session, onLogout }) {
         />
       )}
 
-      {isDispatcher && view === "detail" && selectedCall && (
+      {isControl && view === "detail" && selectedCall && (
         <CallDetail
           sc={selectedCall} allCalls={allCalls} patchField={patchField} notify={notify}
           confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
@@ -219,11 +219,11 @@ export default function MainApp({ session, onLogout }) {
         />
       )}
 
-      {!isDispatcher && view === "rider-list" && (
+      {!isControl && view === "rider-list" && (
         <RiderList active={pendingDB.filter(isMyRun)} completed={completedDB.filter(isMyRun)} onOpen={(id) => { setDetailId(id); setView("rider-detail"); }} />
       )}
 
-      {!isDispatcher && view === "rider-detail" && selectedCall && (
+      {!isControl && view === "rider-detail" && selectedCall && (
         <RiderDetail
           call={selectedCall}
           onBack={() => setView("rider-list")}
