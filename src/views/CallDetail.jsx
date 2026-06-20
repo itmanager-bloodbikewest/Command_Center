@@ -74,17 +74,23 @@ function TimingRow({ label, fieldKey, note, sc, allCalls, patchField, notify, is
   );
 }
 
-export default function CallDetail({ sc, allCalls, patchField, notify, vehicles = [], confirmComplete, setConfirmComplete, markComplete, onTryComplete, onBack }) {
+export default function CallDetail({ sc, allCalls, patchField, notify, vehicles = [], confirmComplete, setConfirmComplete, markComplete, onTryComplete, onBack, readOnly = false }) {
   const C = useC();
   const isCompleted = sc.status === "complete";
-  const rowCtx = { sc, patchField, notify, isCompleted };
-  const timeCtx = { sc, allCalls, patchField, notify, isCompleted };
+  const locked = isCompleted || readOnly; // no editing affordances when locked
+  const rowCtx = { sc, patchField, notify, isCompleted: locked };
+  const timeCtx = { sc, allCalls, patchField, notify, isCompleted: locked };
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 16, maxWidth: 900, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      {readOnly && !isCompleted && (
+        <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 11, color: C.muted, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>
+          👁  READ-ONLY — admin view. You can view this run but not edit it.
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, gap: 12 }}>
         <div><button onClick={onBack} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 6 }}>← BACK TO LOG</button><div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace", color: isCompleted ? C.purple : C.accentText }}>{sc.originHospital} → {sc.destinationHospital}</div><div style={{ marginTop: 6 }}><Badge s={sc.status} /></div>{isCompleted && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Completed {sc.completedAt}</div>}</div>
-        {!isCompleted && (!confirmComplete
+        {!locked && (!confirmComplete
           ? <button onClick={onTryComplete} style={{ background: C.purple, border: "none", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, boxShadow: `0 0 20px ${C.purple}44`, flexShrink: 0 }}>✓ MARK COMPLETE</button>
           : <div style={{ background: C.confirmBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: "14px 18px", textAlign: "center", minWidth: 200 }}><div style={{ fontSize: 12, color: C.text, marginBottom: 10, fontFamily: "'IBM Plex Mono',monospace" }}>Move to Completed Calls?</div><div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>This will archive the record.</div><div style={{ display: "flex", gap: 8 }}><button onClick={() => markComplete(sc.id)} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button><button onClick={() => setConfirmComplete(false)} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button></div></div>
         )}
@@ -132,7 +138,7 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
       </Section>
       <Section title="Notes">
         <NotesList notes={sc.notes} />
-        {!isCompleted && <ControllerNoteBox sc={sc} patchField={patchField} notify={notify} />}
+        {!locked && <ControllerNoteBox sc={sc} patchField={patchField} notify={notify} />}
       </Section>
     </div>
   );
