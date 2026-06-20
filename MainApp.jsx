@@ -52,7 +52,7 @@ export default function NewCallForm({
         <Grid cols={2}>
           <div><Label auto>Timestamp</Label><input aria-label="Timestamp (auto)" value={form.timestamp} readOnly style={{ ...inp(C, false, true), width: "100%" }} /></div>
           <div><Label>Time of Call from Hospital *</Label><input type="time" aria-label="Time of Call from Hospital" value={form.timeOfCall} onChange={(e) => fset("timeOfCall", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label note="defaults to today">Date of Call from Hospital</Label><input type="date" aria-label="Date of Call from Hospital" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label>Date of Call from Hospital</Label><input type="date" aria-label="Date of Call from Hospital" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
           <div><Label>Controller Name *</Label>
             <select aria-label="Controller Name" value={form.controllerName} onChange={(e) => fset("controllerName", e.target.value)} style={{ ...sel(C), width: "100%" }}>
               <option value="">— Select —</option>
@@ -61,7 +61,7 @@ export default function NewCallForm({
           </div>
           <div><Label>Transport Date *</Label><input type="date" aria-label="Transport Date" value={form.transportDate} onChange={(e) => fset("transportDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
           <div>
-            <Label auto note="syncs to transport date">Date Call Received</Label>
+            <Label auto>Date Call Received</Label>
             <input type="date" aria-label="Date Call Received" value={form.dateCallReceived} onChange={(e) => fset("dateCallReceived", e.target.value)} style={{ ...inp(C), width: "100%" }} />
           </div>
         </Grid>
@@ -101,7 +101,7 @@ export default function NewCallForm({
           <div><Label>Rider Duty Status</Label><select aria-label="Rider Duty Status" value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
           <div><Label>Vehicle Used</Label><select aria-label="Vehicle Used" value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
           <div>
-            <Label>Meet with Other Group</Label>
+            <Label optional>Meet with Other Group</Label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 4 }}>
               {meetups.map((g) => {
                 const active = Array.isArray(form.meetOtherGroup) && form.meetOtherGroup.includes(g);
