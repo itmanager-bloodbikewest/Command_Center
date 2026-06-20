@@ -19,4 +19,21 @@ export const STATUS = {
   "complete":       { label:"Transport Complete", colorKey:"purple" },
 };
 
-export const REQUIRED_CALL_FIELDS = ["controllerName", "originHospital", "destinationHospital", "riders", "numPackages"];
+// Required to OPEN a call (the asterisked fields). numPackages additionally
+// must be >= 1 (validated separately — see submitCall).
+export const REQUIRED_CALL_FIELDS = ["controllerName", "timeOfCall", "transportDate", "originHospital", "destinationHospital", "riders", "numPackages"];
+
+// Required to mark a call COMPLETE (non-asterisked but enforced at completion).
+export const COMPLETE_REQUIRED_FIELDS = ["vehicleUsed"];
+
+// Friendly labels for warning messages.
+export const FIELD_LABELS = {
+  controllerName: "Controller",
+  timeOfCall: "Time of call",
+  transportDate: "Transport date",
+  originHospital: "Origin",
+  destinationHospital: "Destination",
+  riders: "Rider",
+  numPackages: "Number of packages",
+  vehicleUsed: "Vehicle",
+};

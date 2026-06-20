@@ -87,7 +87,7 @@ export default function NewCallForm({
           <SuggestionDropdown items={itemSugg} onPick={(s) => { ftog("itemsTransported", s); setItemQ(""); }} right={70} />
         </div>
         {form.itemsTransported.length > 0 && <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>{form.itemsTransported.map((i) => <span key={i} style={{ background: C.accent + "22", color: C.accentText, border: `1px solid ${C.accent}44`, borderRadius: 12, padding: "3px 10px", fontSize: 11 }}>{i} <span onClick={() => ftog("itemsTransported", i)} style={{ cursor: "pointer", marginLeft: 4, color: C.red }}>×</span></span>)}</div>}
-        <div style={{ marginTop: 14 }}><Label>Number of Packages</Label><input type="number" min="0" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120 }} /></div>
+        <div style={{ marginTop: 14 }}><Label>Number of Packages *</Label><input type="number" min="1" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120 }} /></div>
       </Section>
 
       <Section title="Crew & Vehicle">
@@ -124,7 +124,7 @@ export default function NewCallForm({
       </Section>
 
       <Section title="Authorisation">
-        <Label>Green Lights Authorised *</Label>
+        <Label>Green Lights Authorised</Label>
         <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
           {[true, false].map((val) => <button key={String(val)} onClick={() => fset("greenLights", val)} style={{ padding: "8px 24px", borderRadius: 7, border: `1px solid ${form.greenLights === val ? (val ? C.green : C.red) : C.borderHi}`, background: form.greenLights === val ? (val ? C.green + "22" : C.red + "22") : C.card, color: form.greenLights === val ? (val ? C.green : C.red) : C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>{val ? "✓  YES" : "✕  NO"}</button>)}
         </div>

@@ -3,7 +3,7 @@ import { useC } from "./lib/theme.jsx";
 import { api } from "./lib/api.js";
 import { clearSession } from "./lib/session.js";
 import { nowTime, nowDate, nowDT } from "./lib/datetime.js";
-import { EMPTY_CALL, REQUIRED_CALL_FIELDS } from "./constants.js";
+import { EMPTY_CALL, REQUIRED_CALL_FIELDS, COMPLETE_REQUIRED_FIELDS, FIELD_LABELS } from "./constants.js";
 
 import RunLog from "./views/RunLog.jsx";
 import NewCallForm from "./views/NewCallForm.jsx";
@@ -119,9 +119,14 @@ export default function MainApp({ session, onLogout }) {
     notify(`"${v}" added`);
   };
 
+  const missingMsg = (head, keys) => head + "\n" + keys.map((k) => "• " + FIELD_LABELS[k]).join("\n");
+
   const submitCall = async () => {
-    const missing = REQUIRED_CALL_FIELDS.filter((k) => !form[k] || (Array.isArray(form[k]) && !form[k].length));
-    if (missing.length) { notify("Please complete all required fields", C.red); return; }
+    const missing = REQUIRED_CALL_FIELDS.filter((k) => {
+      if (k === "numPackages") return !(Number(form.numPackages) >= 1);
+      return !form[k] || (Array.isArray(form[k]) && !form[k].length);
+    });
+    if (missing.length) { notify(missingMsg("Can't open call — missing required:", missing), C.red); return; }
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     const record = { ...form, id, status: "pending-pickup" };
     setPendingDB((prev) => [record, ...prev]);
@@ -135,9 +140,19 @@ export default function MainApp({ session, onLogout }) {
   const triggerDropoff = (id) => { patchCall(id, { meetupTime: nowTime(), deliveryTime: nowTime(), status: "delivered" }); notify("Delivery recorded ✓"); };
   const triggerRiderHome = (id) => { patchCall(id, { riderHome: nowTime() }); notify("Rider home recorded"); };
 
+  const completeMissing = (call) => COMPLETE_REQUIRED_FIELDS.filter((k) => !call[k] || (Array.isArray(call[k]) && !call[k].length));
+
+  const tryComplete = () => {
+    if (!selectedCall) return;
+    const missing = completeMissing(selectedCall);
+    if (missing.length) { notify(missingMsg("Can't complete — missing required:", missing), C.red); return; }
+    setConfirmComplete(true);
+  };
+
   const markComplete = async (id) => {
     const call = pendingDB.find((x) => x.id === id); if (!call) return;
-    if (!call.vehicleUsed) { setConfirmComplete(false); notify("Pick a vehicle before completing", C.red); return; }
+    const missing = completeMissing(call);
+    if (missing.length) { setConfirmComplete(false); notify(missingMsg("Can't complete — missing required:", missing), C.red); return; }
     const completedAt = nowDT();
     setPendingDB((prev) => prev.filter((x) => x.id !== id));
     setConfirmComplete(false); setView("log");
@@ -160,7 +175,7 @@ export default function MainApp({ session, onLogout }) {
     <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, display: "flex", flexDirection: "column" }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      {toast && <div role="alert" style={{ position: "fixed", top: 16, right: 16, background: toast.color, color: "#fff", padding: "10px 20px", borderRadius: 7, fontSize: 13, zIndex: 9999, boxShadow: "0 4px 24px rgba(0,0,0,0.3)", fontFamily: "'IBM Plex Mono',monospace" }}>{toast.msg}</div>}
+      {toast && <div role="alert" style={{ position: "fixed", top: 16, right: 16, background: toast.color, color: "#fff", padding: "10px 20px", borderRadius: 7, fontSize: 13, zIndex: 9999, boxShadow: "0 4px 24px rgba(0,0,0,0.3)", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "pre-line", maxWidth: 300, lineHeight: 1.6 }}>{toast.msg}</div>}
 
       {/* Header */}
       <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: "0 16px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
@@ -216,7 +231,7 @@ export default function MainApp({ session, onLogout }) {
         <CallDetail
           sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
           confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
-          markComplete={markComplete} onBack={() => setView("log")}
+          markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("log")}
         />
       )}
 
