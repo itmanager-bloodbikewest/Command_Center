@@ -177,6 +177,7 @@ export default function MainApp({ session, onLogout }) {
 
   const isControl = dash === "control";
   const isAdminView = dash === "admin";
+  const hasHeaderActions = isControl || dashboards.length > 1; // is there a row-2 on mobile
 
   // A run is editable in the admin view only if this admin logged it.
   const loggedByMe = (rc) => !!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone);
@@ -192,35 +193,55 @@ export default function MainApp({ session, onLogout }) {
   return (
     <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, display: "flex", flexDirection: "column" }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      <style>{`
+        .bbw-header{display:flex;align-items:center;gap:8px;height:56px;padding:0 16px;flex-shrink:0}
+        .bbw-brand{order:0;margin-right:auto}
+        .bbw-newcall{order:1}
+        .bbw-toggle{order:2}
+        .bbw-account{order:3}
+        .bbw-break{display:none;order:2}
+        @media (max-width:520px){
+          .bbw-header{height:auto;flex-wrap:wrap;row-gap:8px;padding-top:8px;padding-bottom:8px}
+          .bbw-brand{order:1;margin-right:auto}
+          .bbw-account{order:2}
+          .bbw-break{display:block;order:3;flex-basis:100%;height:0;margin:0}
+          .bbw-newcall{order:4}
+          .bbw-toggle{order:5}
+          .bbw-brand-title{font-size:11px;letter-spacing:1px}
+        }
+      `}</style>
 
       {toast && <div role="alert" style={{ position: "fixed", top: 16, right: 16, background: toast.color, color: "#fff", padding: "10px 20px", borderRadius: 7, fontSize: 13, zIndex: 9999, boxShadow: "0 4px 24px rgba(0,0,0,0.3)", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "pre-line", maxWidth: 300, lineHeight: 1.6 }}>{toast.msg}</div>}
 
       {/* Header */}
-      <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: "0 16px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+      <div className="bbw-header" style={{ background: C.panel, borderBottom: `1px solid ${C.border}` }}>
+        <div className="bbw-brand" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           <img src="/logo.png" alt="Blood Bike West logo" style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 2, fontFamily: "'IBM Plex Mono',monospace", color: C.text, whiteSpace: "nowrap" }}>BLOOD BIKE WEST</div>
+            <div className="bbw-brand-title" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 2, fontFamily: "'IBM Plex Mono',monospace", color: C.text, whiteSpace: "nowrap" }}>BLOOD BIKE WEST</div>
             <div style={{ fontSize: 8, color: C.muted, letterSpacing: 3 }}>COMMAND CENTRE</div>
           </div>
         </div>
-        {isControl && <button onClick={initiateNewCall} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>+ NEW CALL</button>}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {dashboards.length > 1 && (
-            <div style={{ display: "flex", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, gap: 3 }}>
-              {dashboards.map(([d, label]) => (
-                <button key={d} onClick={() => { setDash(d); setView(dashHome(d)); }}
-                  style={{ background: dash === d ? C.accent : "transparent", color: dash === d ? "#fff" : C.muted, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, fontWeight: 600 }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: C.text, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-            <button onClick={() => { clearSession(); onLogout(); }} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: "5px 12px", borderRadius: 6, letterSpacing: 1, marginTop: 4 }}>SIGN OUT</button>
-          </div>
+
+        <div className="bbw-account" style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: 11, color: C.text, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+          <button onClick={() => { clearSession(); onLogout(); }} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: "5px 12px", borderRadius: 6, letterSpacing: 1, marginTop: 4 }}>SIGN OUT</button>
         </div>
+
+        {hasHeaderActions && <div className="bbw-break" />}
+
+        {isControl && <button className="bbw-newcall" onClick={initiateNewCall} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>+ NEW CALL</button>}
+
+        {dashboards.length > 1 && (
+          <div className="bbw-toggle" style={{ display: "flex", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, gap: 3, flexShrink: 0 }}>
+            {dashboards.map(([d, label]) => (
+              <button key={d} onClick={() => { setDash(d); setView(dashHome(d)); }}
+                style={{ background: dash === d ? C.accent : "transparent", color: dash === d ? "#fff" : C.muted, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, fontWeight: 600 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Control sub-nav */}
