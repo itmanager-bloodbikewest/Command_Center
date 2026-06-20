@@ -1,18 +1,29 @@
+import { useState } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Section, Grid, Label, Chip, inp, sel } from "../ui/primitives.jsx";
 import LocationField from "../components/LocationField.jsx";
 import SuggestionDropdown from "../components/SuggestionDropdown.jsx";
 import AutoTime from "../components/AutoTime.jsx";
-import { nowDate } from "../lib/datetime.js";
 
 export default function NewCallForm({
   form, fset, ftog, handleOverride,
-  lists, onAddLocation,
+  lists, onAddLocation, onAddMeetup,
   itemQuery, setItemQ, itemSugg, addItem, confirmItem, setCI, confirmAdd,
   onSubmit, onCancel,
 }) {
   const C = useC();
   const { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses } = lists;
+  const [newGroup, setNewGroup] = useState("");
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  const addGroup = () => {
+    const v = newGroup.trim();
+    if (!v) return;
+    if (!meetups.includes(v)) onAddMeetup(v);
+    const cur = Array.isArray(form.meetOtherGroup) ? form.meetOtherGroup : [];
+    if (!cur.includes(v)) fset("meetOtherGroup", [...cur, v]);
+    setNewGroup("");
+  };
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 16, maxWidth: 920, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
@@ -25,6 +36,16 @@ export default function NewCallForm({
           </div>
         </div>
       )}
+      {confirmLeave && (
+        <div style={{ background: C.confirmBg, border: `1px solid ${C.red}`, borderRadius: 8, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, color: C.text }}>Go back? Unsaved details will be lost.</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onCancel} style={{ background: C.red, color: "#fff", border: "none", borderRadius: 5, padding: "6px 16px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>DISCARD</button>
+            <button onClick={() => setConfirmLeave(false)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>STAY</button>
+          </div>
+        </div>
+      )}
+      <button onClick={() => setConfirmLeave(true)} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 10 }}>← BACK</button>
       <div style={{ fontSize: 10, color: C.muted, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, marginBottom: 18 }}>NEW CALL — * REQUIRED FIELDS</div>
 
       <Section title="Call Metadata">
@@ -78,7 +99,7 @@ export default function NewCallForm({
             </select>
           </div>
           <div><Label>Rider Duty Status</Label><select value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
-          <div><Label>Vehicle Used *</Label><select value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
+          <div><Label>Vehicle Used</Label><select value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
           <div>
             <Label>Meet with Other Group</Label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 4 }}>
@@ -90,9 +111,13 @@ export default function NewCallForm({
                 }}>{active ? "✓ " : ""}{g}</Chip>;
               })}
             </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+              <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addGroup())} placeholder="Add a new group…" style={{ ...inp(C), flex: 1, width: "auto" }} />
+              <button onClick={addGroup} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
+            </div>
           </div>
           <Grid cols={2}>
-            <div><Label optional>Scheduled Meet-up Date</Label><input type="date" value={form.scheduledMeetupDate || nowDate()} onChange={(e) => fset("scheduledMeetupDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+            <div><Label optional>Scheduled Meet-up Date</Label><input type="date" value={form.scheduledMeetupDate} onChange={(e) => fset("scheduledMeetupDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
             <div><Label optional>Scheduled Meet-up Time</Label><input type="time" value={form.scheduledMeetupTime} onChange={(e) => fset("scheduledMeetupTime", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
           </Grid>
         </Grid>
@@ -130,7 +155,7 @@ export default function NewCallForm({
 
       <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>
         <button onClick={onSubmit} style={{ flex: 1, background: C.accent, border: "none", color: "#fff", padding: "14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1 }}>LOG CALL & OPEN RUN</button>
-        <button onClick={onCancel} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "14px 22px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button>
+        <button onClick={() => setConfirmLeave(true)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "14px 22px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button>
       </div>
     </div>
   );

@@ -19,4 +19,4 @@ export const STATUS = {
   "complete":       { label:"Transport Complete", colorKey:"purple" },
 };
 
-export const REQUIRED_CALL_FIELDS = ["controllerName", "originHospital", "destinationHospital", "riders", "vehicleUsed", "numPackages"];
+export const REQUIRED_CALL_FIELDS = ["controllerName", "originHospital", "destinationHospital", "riders", "numPackages"];

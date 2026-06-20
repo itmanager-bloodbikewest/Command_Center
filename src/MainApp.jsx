@@ -73,7 +73,7 @@ export default function MainApp({ session, onLogout }) {
 
   const initiateNewCall = () => {
     const td = nowDate();
-    setForm({ ...EMPTY_CALL, timestamp: nowDT(), riderCalled: nowTime(), transportDate: td, dateCallReceived: td, dateOfCallFromHospital: td, controllerName: name, meetOtherGroup: [], overrides: {} });
+    setForm({ ...EMPTY_CALL, timestamp: nowDT(), riderCalled: nowTime(), transportDate: td, dateCallReceived: td, dateOfCallFromHospital: td, scheduledMeetupDate: td, controllerName: name, meetOtherGroup: [], overrides: {} });
     setItemQ(""); setItemSugg([]); setCI(null);
     setView("newcall");
   };
@@ -111,6 +111,11 @@ export default function MainApp({ session, onLogout }) {
   const onAddLocation = (v) => {
     setHospitals((p) => [...p, v].sort());
     api("addToList", { sheet: "OriginDestination", value: v }).catch(() => {});
+    notify(`"${v}" added`);  };
+
+  const onAddMeetup = (v) => {
+    setMeetups((p) => [...p, v].sort());
+    api("addToList", { sheet: "Meetups", value: v }).catch(() => {});
     notify(`"${v}" added`);
   };
 
@@ -132,6 +137,7 @@ export default function MainApp({ session, onLogout }) {
 
   const markComplete = async (id) => {
     const call = pendingDB.find((x) => x.id === id); if (!call) return;
+    if (!call.vehicleUsed) { setConfirmComplete(false); notify("Pick a vehicle before completing", C.red); return; }
     const completedAt = nowDT();
     setPendingDB((prev) => prev.filter((x) => x.id !== id));
     setConfirmComplete(false); setView("log");
@@ -199,7 +205,7 @@ export default function MainApp({ session, onLogout }) {
       {isControl && view === "newcall" && (
         <NewCallForm
           form={form} fset={fset} ftog={ftog} handleOverride={handleOverride}
-          lists={lists} onAddLocation={onAddLocation}
+          lists={lists} onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
           itemQuery={itemQuery} setItemQ={setItemQ} itemSugg={itemSugg} addItem={addItem}
           confirmItem={confirmItem} setCI={setCI} confirmAdd={confirmAdd}
           onSubmit={submitCall} onCancel={() => setView("log")}
@@ -208,7 +214,7 @@ export default function MainApp({ session, onLogout }) {
 
       {isControl && view === "detail" && selectedCall && (
         <CallDetail
-          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify}
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
           confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
           markComplete={markComplete} onBack={() => setView("log")}
         />

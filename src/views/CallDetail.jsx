@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
-import { Section, Badge, inp } from "../ui/primitives.jsx";
+import { Section, Badge, inp, sel } from "../ui/primitives.jsx";
 import { fmtDate, fmtTime, fmtDT, nowDT } from "../lib/datetime.js";
 import NotesList from "../components/NotesList.jsx";
 
@@ -30,7 +30,7 @@ function ControllerNoteBox({ sc, patchField, notify }) {
 }
 
 // Editable / read-only metadata row.
-function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, sc, patchField, notify, isCompleted }) {
+function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, sc, patchField, notify, isCompleted }) {
   const C = useC();
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(sc[fieldKey] || "");
@@ -48,7 +48,9 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
     <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
       <div style={{ width: 160, fontSize: 10, color: C.muted, letterSpacing: 1, fontFamily: "'IBM Plex Mono',monospace", flexShrink: 0 }}>{label.toUpperCase()}</div>
       {editing
-        ? <div style={{ display: "flex", gap: 6, flex: 1 }}><input type={type} value={type === "date" ? fmtDate(val) : type === "time" ? fmtTime(val) : val} onChange={(e) => setVal(e.target.value)} autoFocus style={{ ...inp(C, true), flex: 1, width: "auto" }} onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }} /><button onClick={save} style={{ background: C.green, color: isDark(C) ? "#000" : "#fff", border: "none", borderRadius: 5, padding: "0 12px", cursor: "pointer", fontSize: 11, fontFamily: "'IBM Plex Mono',monospace" }}>SAVE</button><button onClick={() => setEditing(false)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "0 10px", cursor: "pointer", fontSize: 11 }}>✕</button></div>
+        ? <div style={{ display: "flex", gap: 6, flex: 1 }}>{options
+            ? <select value={val} onChange={(e) => setVal(e.target.value)} autoFocus style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
+            : <input type={type} value={type === "date" ? fmtDate(val) : type === "time" ? fmtTime(val) : val} onChange={(e) => setVal(e.target.value)} autoFocus style={{ ...inp(C, true), flex: 1, width: "auto" }} onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }} />}<button onClick={save} style={{ background: C.green, color: isDark(C) ? "#000" : "#fff", border: "none", borderRadius: 5, padding: "0 12px", cursor: "pointer", fontSize: 11, fontFamily: "'IBM Plex Mono',monospace" }}>SAVE</button><button onClick={() => setEditing(false)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "0 10px", cursor: "pointer", fontSize: 11 }}>✕</button></div>
         : <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 13, color: val ? C.text : C.muted }}>{fmt ? fmt(val) : val || "—"}</span>{!isCompleted && <button onClick={() => setEditing(true)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 10, fontFamily: "'IBM Plex Mono',monospace" }}>✎ edit</button>}</div>}
     </div>
   );
@@ -72,7 +74,7 @@ function TimingRow({ label, fieldKey, note, sc, allCalls, patchField, notify, is
   );
 }
 
-export default function CallDetail({ sc, allCalls, patchField, notify, confirmComplete, setConfirmComplete, markComplete, onBack }) {
+export default function CallDetail({ sc, allCalls, patchField, notify, vehicles = [], confirmComplete, setConfirmComplete, markComplete, onBack }) {
   const C = useC();
   const isCompleted = sc.status === "complete";
   const rowCtx = { sc, patchField, notify, isCompleted };
@@ -83,7 +85,7 @@ export default function CallDetail({ sc, allCalls, patchField, notify, confirmCo
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, gap: 12 }}>
         <div><button onClick={onBack} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 6 }}>← BACK TO LOG</button><div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace", color: isCompleted ? C.purple : C.accentText }}>{sc.originHospital} → {sc.destinationHospital}</div><div style={{ marginTop: 6 }}><Badge s={sc.status} /></div>{isCompleted && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Completed {sc.completedAt}</div>}</div>
         {!isCompleted && (!confirmComplete
-          ? <button onClick={() => setConfirmComplete(true)} style={{ background: C.purple, border: "none", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, boxShadow: `0 0 20px ${C.purple}44`, flexShrink: 0 }}>✓ MARK COMPLETE</button>
+          ? <button onClick={() => sc.vehicleUsed ? setConfirmComplete(true) : notify("Pick a vehicle before completing", C.red)} style={{ background: C.purple, border: "none", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, boxShadow: `0 0 20px ${C.purple}44`, flexShrink: 0 }}>✓ MARK COMPLETE</button>
           : <div style={{ background: C.confirmBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: "14px 18px", textAlign: "center", minWidth: 200 }}><div style={{ fontSize: 12, color: C.text, marginBottom: 10, fontFamily: "'IBM Plex Mono',monospace" }}>Move to Completed Calls?</div><div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>This will archive the record.</div><div style={{ display: "flex", gap: 8 }}><button onClick={() => markComplete(sc.id)} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button><button onClick={() => setConfirmComplete(false)} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button></div></div>
         )}
       </div>
@@ -101,17 +103,19 @@ export default function CallDetail({ sc, allCalls, patchField, notify, confirmCo
         <EditRow {...rowCtx} label="Destination" readOnly><span>{sc.destinationHospital}</span></EditRow>
         <EditRow {...rowCtx} label="Items" readOnly><span>{Array.isArray(sc.itemsTransported) ? sc.itemsTransported.join(", ") : sc.itemsTransported || "—"}</span></EditRow>
         <EditRow {...rowCtx} label="No. of Packages" fieldKey="numPackages" type="number" />
-        <EditRow {...rowCtx} label="Pick-up Address" fieldKey="pickupAddress" />
-        <EditRow {...rowCtx} label="Drop-off Address" fieldKey="dropOffAddress" />
       </Section>
-      <Section title="Contact">
-        <EditRow {...rowCtx} label="Contact Name" fieldKey="contactName" />
-        <EditRow {...rowCtx} label="Contact Phone" fieldKey="contactPhone" type="tel" />
-      </Section>
+      {(sc.contactName || sc.contactPhone || sc.pickupAddress || sc.dropOffAddress) && (
+        <Section title="Contact">
+          {sc.contactName && <EditRow {...rowCtx} label="Contact Name" fieldKey="contactName" />}
+          {sc.contactPhone && <EditRow {...rowCtx} label="Contact Phone" fieldKey="contactPhone" type="tel" />}
+          {sc.pickupAddress && <EditRow {...rowCtx} label="Pick-up Address" fieldKey="pickupAddress" />}
+          {sc.dropOffAddress && <EditRow {...rowCtx} label="Drop-off Address" fieldKey="dropOffAddress" />}
+        </Section>
+      )}
       <Section title="Crew & Vehicle">
         <EditRow {...rowCtx} label="Rider(s)" readOnly><span>{Array.isArray(sc.riders) ? sc.riders.join(", ") : sc.riders || "—"}</span></EditRow>
         <EditRow {...rowCtx} label="Duty Status" readOnly><span>{sc.riderDutyStatus || "—"}</span></EditRow>
-        <EditRow {...rowCtx} label="Vehicle" readOnly><span>{sc.vehicleUsed || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicles} />
         <EditRow {...rowCtx} label="Meet Other Group" readOnly><span>{Array.isArray(sc.meetOtherGroup) ? sc.meetOtherGroup.join(", ") || "—" : sc.meetOtherGroup || "—"}</span></EditRow>
         <EditRow {...rowCtx} label="Meet-up Date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate} />
         <EditRow {...rowCtx} label="Meet-up Time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
