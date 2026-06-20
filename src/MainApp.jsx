@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useC } from "./lib/theme.jsx";
 import { api } from "./lib/api.js";
-import { clearSession } from "./lib/session.js";
+import { clearSession, normalizePhone } from "./lib/session.js";
 import { nowTime, nowDate, nowDT } from "./lib/datetime.js";
 import { EMPTY_CALL, REQUIRED_CALL_FIELDS, COMPLETE_REQUIRED_FIELDS, FIELD_LABELS } from "./constants.js";
 
@@ -22,8 +22,22 @@ export default function MainApp({ session, onLogout }) {
   const C = useC();
   const { role, name, controllers, riders } = session;
 
-  const [dash, setDash] = useState(role === "rider" ? "rider" : "control");
-  const [view, setView] = useState(role === "rider" ? "rider-list" : "log");
+  // Available dashboards come from explicit flags; fall back to deriving them
+  // from `role` for any older session saved before the flags existed.
+  const canControl = session.isController ?? (role === "controller" || role === "dual user");
+  const canRide    = session.isRider ?? (role === "rider" || role === "dual user");
+  const canAdmin   = session.isAdmin ?? (role === "admin");
+  const dashboards = [
+    canControl && ["control", "CTL"],
+    canRide && ["rider", "RDR"],
+    canAdmin && ["admin", "ADM"],
+  ].filter(Boolean);
+  // Default to control, then rider, then admin (pure admin lands in admin).
+  const defaultDash = canControl ? "control" : canRide ? "rider" : "admin";
+  const dashHome = (d) => (d === "control" ? "log" : d === "rider" ? "rider-list" : "admin-list");
+
+  const [dash, setDash] = useState(defaultDash);
+  const [view, setView] = useState(dashHome(defaultDash));
   const [pendingDB, setPendingDB] = useState([]);
   const [form, setForm] = useState({ ...EMPTY_CALL });
   const [hospitals, setHospitals] = useState([]);
@@ -162,6 +176,10 @@ export default function MainApp({ session, onLogout }) {
   };
 
   const isControl = dash === "control";
+  const isAdminView = dash === "admin";
+
+  // A run is editable in the admin view only if this admin logged it.
+  const loggedByMe = (rc) => !!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone);
 
   const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
 
@@ -188,10 +206,10 @@ export default function MainApp({ session, onLogout }) {
         </div>
         {isControl && <button onClick={initiateNewCall} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>+ NEW CALL</button>}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {role === "dual user" && (
+          {dashboards.length > 1 && (
             <div style={{ display: "flex", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, gap: 3 }}>
-              {[["control", "CTL"], ["rider", "RDR"]].map(([d, label]) => (
-                <button key={d} onClick={() => { setDash(d); setView(d === "control" ? "log" : "rider-list"); }}
+              {dashboards.map(([d, label]) => (
+                <button key={d} onClick={() => { setDash(d); setView(dashHome(d)); }}
                   style={{ background: dash === d ? C.accent : "transparent", color: dash === d ? "#fff" : C.muted, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, fontWeight: 600 }}>
                   {label}
                 </button>
@@ -200,7 +218,7 @@ export default function MainApp({ session, onLogout }) {
           )}
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: C.text, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-            <button onClick={() => { clearSession(); onLogout(); }} style={{ background: "none", border: "none", color: C.muted, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, letterSpacing: 1 }}>SIGN OUT</button>
+            <button onClick={() => { clearSession(); onLogout(); }} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: "5px 12px", borderRadius: 6, letterSpacing: 1, marginTop: 4 }}>SIGN OUT</button>
           </div>
         </div>
       </div>
@@ -235,11 +253,11 @@ export default function MainApp({ session, onLogout }) {
         />
       )}
 
-      {!isControl && view === "rider-list" && (
+      {dash === "rider" && view === "rider-list" && (
         <RiderList active={pendingDB.filter(isMyRun)} onOpen={(id) => { setDetailId(id); setView("rider-detail"); }} />
       )}
 
-      {!isControl && view === "rider-detail" && selectedCall && (
+      {dash === "rider" && view === "rider-detail" && selectedCall && (
         <RiderDetail
           call={selectedCall}
           onBack={() => setView("rider-list")}
@@ -250,6 +268,19 @@ export default function MainApp({ session, onLogout }) {
             const updated = (selectedCall.notes ? selectedCall.notes + "\n\n" : "") + `[Rider ${nowDT()}]: ` + note;
             patchCall(selectedCall.id, { notes: updated });
           }}
+        />
+      )}
+
+      {isAdminView && view === "admin-list" && (
+        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("admin-detail"); }} onNewCall={null} />
+      )}
+
+      {isAdminView && view === "admin-detail" && selectedCall && (
+        <CallDetail
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
+          confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
+          markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("admin-list")}
+          readOnly={!loggedByMe(selectedCall)}
         />
       )}
     </div>
