@@ -1,7 +1,7 @@
 // Shared data constants.
 
 export const EMPTY_CALL = {
-  timestamp:"", timeOfCall:"", dateOfCallFromHospital:"", controllerName:"",
+  timestamp:"", timeOfCall:"", dateOfCallFromHospital:"", controllerName:"", controllerPhone:"",
   transportDate:"", dateCallReceived:"",
   originHospital:"", destinationHospital:"",
   itemsTransported:[], numPackages:"", riders:[], riderDutyStatus:"",
