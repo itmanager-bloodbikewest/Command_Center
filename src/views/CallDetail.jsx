@@ -1,7 +1,33 @@
 import { useState, useEffect } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Section, Badge, inp } from "../ui/primitives.jsx";
-import { fmtDate, fmtTime, fmtDT } from "../lib/datetime.js";
+import { fmtDate, fmtTime, fmtDT, nowDT } from "../lib/datetime.js";
+import NotesList from "../components/NotesList.jsx";
+
+// Lets a controller append a timestamped note to an active run.
+function ControllerNoteBox({ sc, patchField, notify }) {
+  const C = useC();
+  const [note, setNote] = useState("");
+  const [saved, setSaved] = useState(false);
+  const save = () => {
+    const t = note.trim();
+    if (!t) return;
+    const updated = (sc.notes ? sc.notes + "\n\n" : "") + `[Controller ${nowDT()}]: ` + t;
+    patchField(sc.id, "notes", updated);
+    setNote(""); setSaved(true); setTimeout(() => setSaved(false), 2000);
+    notify("Note added", C.accent);
+  };
+  return (
+    <div style={{ marginTop: 12 }}>
+      <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Add a note to this run…"
+        style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.6 }} />
+      <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+        <button onClick={save} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 18px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>ADD NOTE</button>
+        {saved && <span style={{ fontSize: 11, color: C.green, fontFamily: "'IBM Plex Mono',monospace" }}>✓ Added</span>}
+      </div>
+    </div>
+  );
+}
 
 // Editable / read-only metadata row.
 function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, sc, patchField, notify, isCompleted }) {
@@ -100,7 +126,10 @@ export default function CallDetail({ sc, allCalls, patchField, notify, confirmCo
         <TimingRow {...timeCtx} label="Rider Home" fieldKey="riderHome" note="triggers on rider Rider Home" />
         {isCompleted && <TimingRow {...timeCtx} label="Completed At" fieldKey="completedAt" />}
       </Section>
-      {sc.notes && <Section title="Notes"><div style={{ fontSize: 13, color: C.text, lineHeight: 1.8 }}>{sc.notes}</div></Section>}
+      <Section title="Notes">
+        <NotesList notes={sc.notes} />
+        {!isCompleted && <ControllerNoteBox sc={sc} patchField={patchField} notify={notify} />}
+      </Section>
     </div>
   );
 }

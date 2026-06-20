@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Label, Section, Badge, inp } from "../ui/primitives.jsx";
-import { fmtTime } from "../lib/datetime.js";
+import { fmtTime, fmtDate } from "../lib/datetime.js";
+import NotesList from "./NotesList.jsx";
 
 const InfoRow = ({ label, value, C }) => value ? (
   <div style={{ padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
@@ -33,8 +34,8 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
   };
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-      <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: "14px 24px", flexShrink: 0 }}>
+    <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", zoom: 1.25 }}>
+      <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: "14px 24px", position: "sticky", top: 0, zIndex: 2, flexShrink: 0 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 6 }}>← BACK</button>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
@@ -48,7 +49,7 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
           )}
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+      <div style={{ padding: 24 }}>
         <div style={{ marginBottom: 24, display: "flex", flexDirection: "column", gap: 12 }}>
           {canPickup && <button onClick={onPickup} style={{ background: C.accent, border: "none", color: "#fff", padding: "20px", borderRadius: 12, fontSize: 17, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 2, boxShadow: `0 0 30px ${C.accent}55` }}>⬆  PICKED UP</button>}
           {canDropoff && <button onClick={onDropoff} style={{ background: C.green, border: "none", color: isDark(C) ? "#000" : "#fff", padding: "20px", borderRadius: 12, fontSize: 17, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 2, boxShadow: `0 0 30px ${C.green}55` }}>✓  DROPPED OFF</button>}
@@ -63,10 +64,11 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
           <InfoRow C={C} label="Drop-off Address" value={c.dropOffAddress || null} />
           <InfoRow C={C} label="Vehicle" value={c.vehicleUsed || null} />
         </Section>
-        {((Array.isArray(c.meetOtherGroup) ? c.meetOtherGroup.length > 0 : c.meetOtherGroup) || c.scheduledMeetupTime) && (
+        {((Array.isArray(c.meetOtherGroup) ? c.meetOtherGroup.length > 0 : c.meetOtherGroup) || c.scheduledMeetupDate || c.scheduledMeetupTime) && (
           <Section title="Meet-up">
             <InfoRow C={C} label="Meet with" value={Array.isArray(c.meetOtherGroup) ? c.meetOtherGroup.join(", ") || null : c.meetOtherGroup || null} />
-            <InfoRow C={C} label="Scheduled Meet-up Time" value={c.scheduledMeetupTime || null} />
+            <InfoRow C={C} label="Scheduled Meet-up Date" value={c.scheduledMeetupDate ? fmtDate(c.scheduledMeetupDate) : null} />
+            <InfoRow C={C} label="Scheduled Meet-up Time" value={c.scheduledMeetupTime ? fmtTime(c.scheduledMeetupTime) : null} />
           </Section>
         )}
         {(c.contactName || c.contactPhone) && (
@@ -81,7 +83,7 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
           <TimeRow C={C} label="Delivered" val={c.deliveryTime} />
           <TimeRow C={C} label="Rider Home" val={c.riderHome} />
         </Section>
-        {c.notes && <Section title="Controller Notes"><div style={{ fontSize: 13, color: C.text, lineHeight: 1.8, whiteSpace: "pre-line" }}>{c.notes}</div></Section>}
+        {c.notes && <Section title="Notes"><NotesList notes={c.notes} /></Section>}
         <Section title="Add Note">
           <Label optional>Visible to controller</Label>
           <textarea value={riderNote} onChange={(e) => setRiderNote(e.target.value)} rows={3}

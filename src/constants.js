@@ -5,7 +5,7 @@ export const EMPTY_CALL = {
   transportDate:"", dateCallReceived:"",
   originHospital:"", destinationHospital:"",
   itemsTransported:[], numPackages:"", riders:[], riderDutyStatus:"",
-  greenLights:null, meetOtherGroup:[], vehicleUsed:"", riderCalled:"", notes:"",
+  greenLights:false, meetOtherGroup:[], vehicleUsed:"", riderCalled:"", notes:"",
   contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"",
   scheduledMeetupDate:"", scheduledMeetupTime:"",
   pickupTime:"", meetupTime:"", deliveryTime:"", riderHome:"", completedAt:"",
@@ -19,4 +19,4 @@ export const STATUS = {
   "complete":       { label:"Transport Complete", colorKey:"purple" },
 };
 
-export const REQUIRED_CALL_FIELDS = ["controllerName", "originHospital", "destinationHospital", "riders", "vehicleUsed"];
+export const REQUIRED_CALL_FIELDS = ["controllerName", "originHospital", "destinationHospital", "riders", "vehicleUsed", "numPackages"];

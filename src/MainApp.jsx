@@ -193,7 +193,7 @@ export default function MainApp({ session, onLogout }) {
       )}
 
       {isControl && view === "log" && (
-        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} />
+        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
       )}
 
       {isControl && view === "newcall" && (
@@ -226,7 +226,7 @@ export default function MainApp({ session, onLogout }) {
           onDropoff={() => triggerDropoff(selectedCall.id)}
           onRiderHome={() => triggerRiderHome(selectedCall.id)}
           onNote={(note) => {
-            const updated = (selectedCall.notes ? selectedCall.notes + "\n\n" : "") + `[Rider ${nowTime()}]: ` + note;
+            const updated = (selectedCall.notes ? selectedCall.notes + "\n\n" : "") + `[Rider ${nowDT()}]: ` + note;
             patchCall(selectedCall.id, { notes: updated });
           }}
         />
