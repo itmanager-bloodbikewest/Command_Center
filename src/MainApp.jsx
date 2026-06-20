@@ -128,7 +128,7 @@ export default function MainApp({ session, onLogout }) {
     });
     if (missing.length) { notify(missingMsg("Can't open call — missing required:", missing), C.red); return; }
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const record = { ...form, id, status: "pending-pickup" };
+    const record = { ...form, id, status: "pending-pickup", controllerPhone: session.phone };
     setPendingDB((prev) => [record, ...prev]);
     setDetailId(id); setView("detail");
     notify("Run logged");
