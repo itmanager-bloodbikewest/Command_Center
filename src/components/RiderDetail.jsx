@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Label, Section, Badge, inp } from "../ui/primitives.jsx";
 import { fmtTime, fmtDate } from "../lib/datetime.js";
+import { isMobileUA, smsLink, whatsappLink } from "../lib/messaging.js";
 import NotesList from "./NotesList.jsx";
 
 const InfoRow = ({ label, value, C }) => value ? (
@@ -18,14 +19,77 @@ const TimeRow = ({ label, val, C }) => (
   </div>
 );
 
+const sheetBtn = (C) => ({
+  width: "100%", display: "flex", alignItems: "center", gap: 14,
+  background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 12,
+  padding: "14px 16px", marginBottom: 10, cursor: "pointer", textAlign: "left",
+});
+
+// Bottom-sheet asking the rider which channel to message the controller on.
+function ChannelChooser({ C, label, controllerName, onPick, onCancel }) {
+  return (
+    <div onClick={onCancel}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000 }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background: C.panel, borderTop: `1px solid ${C.borderHi}`, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "18px 18px 24px", width: "100%", maxWidth: 480, boxShadow: "0 -8px 40px rgba(0,0,0,0.4)" }}>
+        <div style={{ width: 36, height: 4, background: C.borderHi, borderRadius: 2, margin: "0 auto 16px" }} />
+        <div style={{ textAlign: "center", marginBottom: 4, fontSize: 16, fontWeight: 700, color: C.text, fontFamily: "'IBM Plex Sans',sans-serif" }}>
+          Send “{label}” to {controllerName || "controller"}
+        </div>
+        <div style={{ textAlign: "center", marginBottom: 18, fontSize: 12, color: C.muted }}>
+          Choose how to message the controller
+        </div>
+        <button onClick={() => onPick("sms")} style={sheetBtn(C)}>
+          <span style={{ fontSize: 20 }}>💬</span>
+          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.3 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Text message</span>
+            <span style={{ fontSize: 11, color: C.muted }}>Opens your Messages app</span>
+          </span>
+        </button>
+        <button onClick={() => onPick("whatsapp")} style={sheetBtn(C)}>
+          <span style={{ fontSize: 20 }}>🟢</span>
+          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.3 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>WhatsApp</span>
+            <span style={{ fontSize: 11, color: C.muted }}>Opens WhatsApp chat</span>
+          </span>
+        </button>
+        <button onClick={onCancel}
+          style={{ width: "100%", background: "none", border: "none", color: C.muted, padding: "12px", fontSize: 13, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", marginTop: 6 }}>
+          CANCEL
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRiderHome, onNote }) {
   const C = useC();
   const [riderNote, setRiderNote] = useState("");
   const [noteSaved, setNoteSaved] = useState(false);
+  const [chooser, setChooser] = useState(null); // { label, handler } | null
 
   const canPickup = c.status === "pending-pickup";
   const canDropoff = c.status === "in-transit";
   const canHome = c.status === "delivered";
+
+  // On mobile with a controller number, prompt for channel; otherwise write
+  // the status straight through (desktop, or no number to message).
+  const handleStatus = (label, handler) => {
+    if (isMobileUA() && c.controllerPhone) setChooser({ label, handler });
+    else handler();
+  };
+
+  // Channel picked: commit the status, then open the messaging draft.
+  const pickChannel = (channel) => {
+    if (!chooser) return;
+    const { label, handler } = chooser;
+    handler(); // status write — this is the commit point
+    const link = channel === "sms"
+      ? smsLink(c.controllerPhone, label)
+      : whatsappLink(c.controllerPhone, label);
+    if (link) window.location.href = link;
+    setChooser(null);
+  };
 
   const saveNote = () => {
     if (!riderNote.trim()) return;
@@ -51,9 +115,9 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
       </div>
       <div style={{ padding: 24 }}>
         <div style={{ marginBottom: 24, display: "flex", flexDirection: "column", gap: 12 }}>
-          {canPickup && <button onClick={onPickup} style={{ background: C.accent, border: "none", color: "#fff", padding: "20px", borderRadius: 12, fontSize: 17, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 2, boxShadow: `0 0 30px ${C.accent}55` }}>⬆  PICKED UP</button>}
-          {canDropoff && <button onClick={onDropoff} style={{ background: C.green, border: "none", color: isDark(C) ? "#000" : "#fff", padding: "20px", borderRadius: 12, fontSize: 17, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 2, boxShadow: `0 0 30px ${C.green}55` }}>✓  DROPPED OFF</button>}
-          {(canHome || c.riderHome) && <button onClick={canHome ? onRiderHome : undefined} disabled={!!c.riderHome} style={{ background: c.riderHome ? C.card : C.orange, border: `1px solid ${c.riderHome ? C.borderHi : "transparent"}`, color: c.riderHome ? C.muted : isDark(C) ? "#000" : "#fff", padding: "20px", borderRadius: 12, fontSize: 17, cursor: c.riderHome ? "default" : "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 2, boxShadow: c.riderHome ? "none" : `0 0 30px ${C.orange}55` }}>🏠  RIDER HOME{c.riderHome ? ` — ${fmtTime(c.riderHome)}` : ""}</button>}
+          {canPickup && <button onClick={() => handleStatus("Picked up", onPickup)} style={{ background: C.accent, border: "none", color: "#fff", padding: "20px", borderRadius: 12, fontSize: 17, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 2, boxShadow: `0 0 30px ${C.accent}55` }}>⬆  PICKED UP</button>}
+          {canDropoff && <button onClick={() => handleStatus("Dropped off", onDropoff)} style={{ background: C.green, border: "none", color: isDark(C) ? "#000" : "#fff", padding: "20px", borderRadius: 12, fontSize: 17, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 2, boxShadow: `0 0 30px ${C.green}55` }}>✓  DROPPED OFF</button>}
+          {(canHome || c.riderHome) && <button onClick={canHome ? () => handleStatus("Rider home", onRiderHome) : undefined} disabled={!!c.riderHome} style={{ background: c.riderHome ? C.card : C.orange, border: `1px solid ${c.riderHome ? C.borderHi : "transparent"}`, color: c.riderHome ? C.muted : isDark(C) ? "#000" : "#fff", padding: "20px", borderRadius: 12, fontSize: 17, cursor: c.riderHome ? "default" : "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 2, boxShadow: c.riderHome ? "none" : `0 0 30px ${C.orange}55` }}>🏠  RIDER HOME{c.riderHome ? ` — ${fmtTime(c.riderHome)}` : ""}</button>}
           {c.status === "delivered" && <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 12, padding: "14px", textAlign: "center", color: C.muted, fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, letterSpacing: 2 }}>Waiting for controller to mark complete</div>}
         </div>
         <Section title="Run Details">
@@ -63,6 +127,8 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
           <InfoRow C={C} label="Pick-up Address" value={c.pickupAddress || null} />
           <InfoRow C={C} label="Drop-off Address" value={c.dropOffAddress || null} />
           <InfoRow C={C} label="Vehicle" value={c.vehicleUsed || null} />
+          <InfoRow C={C} label="Controller" value={c.controllerName || null} />
+          <InfoRow C={C} label="Controller Phone" value={c.controllerPhone ? <a href={`tel:${c.controllerPhone}`} style={{ color: C.accentText, textDecoration: "none" }}>{c.controllerPhone}</a> : null} />
         </Section>
         {((Array.isArray(c.meetOtherGroup) ? c.meetOtherGroup.length > 0 : c.meetOtherGroup) || c.scheduledMeetupDate || c.scheduledMeetupTime) && (
           <Section title="Meet-up">
@@ -95,6 +161,10 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
           </div>
         </Section>
       </div>
+      {chooser && (
+        <ChannelChooser C={C} label={chooser.label} controllerName={c.controllerName}
+          onPick={pickChannel} onCancel={() => setChooser(null)} />
+      )}
     </div>
   );
 }
