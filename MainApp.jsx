@@ -1,162 +1,311 @@
-import { useState } from "react";
-import { useC, isDark } from "../lib/theme.jsx";
-import { Section, Grid, Label, Chip, inp, sel } from "../ui/primitives.jsx";
-import LocationField from "../components/LocationField.jsx";
-import SuggestionDropdown from "../components/SuggestionDropdown.jsx";
-import AutoTime from "../components/AutoTime.jsx";
+import { useState, useEffect, useCallback } from "react";
+import { useC } from "./lib/theme.jsx";
+import { api } from "./lib/api.js";
+import { clearSession, normalizePhone } from "./lib/session.js";
+import { nowTime, nowDate, nowDT } from "./lib/datetime.js";
+import { EMPTY_CALL, REQUIRED_CALL_FIELDS, COMPLETE_REQUIRED_FIELDS, FIELD_LABELS } from "./constants.js";
 
-export default function NewCallForm({
-  form, fset, ftog, handleOverride,
-  lists, onAddLocation, onAddMeetup,
-  itemQuery, setItemQ, itemSugg, addItem, confirmItem, setCI, confirmAdd,
-  onSubmit, onCancel,
-}) {
+import RunLog from "./views/RunLog.jsx";
+import NewCallForm from "./views/NewCallForm.jsx";
+import CallDetail from "./views/CallDetail.jsx";
+import RiderList from "./views/RiderList.jsx";
+import RiderDetail from "./components/RiderDetail.jsx";
+
+const NavBtn = ({ v, children, view, setView, C }) => (
+  <button onClick={() => setView(v)}
+    style={{ background: view === v ? C.navActive : "none", border: "none", borderBottom: `2px solid ${view === v ? C.accent : "transparent"}`, color: view === v ? C.accentText : C.muted, padding: "14px 18px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, whiteSpace: "nowrap" }}>
+    {children}
+  </button>
+);
+
+export default function MainApp({ session, onLogout }) {
   const C = useC();
-  const { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses } = lists;
-  const [newGroup, setNewGroup] = useState("");
-  const [confirmLeave, setConfirmLeave] = useState(false);
+  const { role, name, controllers, riders } = session;
 
-  const addGroup = () => {
-    const v = newGroup.trim();
-    if (!v) return;
-    if (!meetups.includes(v)) onAddMeetup(v);
-    const cur = Array.isArray(form.meetOtherGroup) ? form.meetOtherGroup : [];
-    if (!cur.includes(v)) fset("meetOtherGroup", [...cur, v]);
-    setNewGroup("");
+  // Available dashboards come from explicit flags; fall back to deriving them
+  // from `role` for any older session saved before the flags existed.
+  const canControl = session.isController ?? (role === "controller" || role === "dual user");
+  const canRide    = session.isRider ?? (role === "rider" || role === "dual user");
+  const canAdmin   = session.isAdmin ?? (role === "admin");
+  const dashboards = [
+    canControl && ["control", "CTL"],
+    canRide && ["rider", "RDR"],
+    canAdmin && ["admin", "ADM"],
+  ].filter(Boolean);
+  // Default to control, then rider, then admin (pure admin lands in admin).
+  const defaultDash = canControl ? "control" : canRide ? "rider" : "admin";
+  const dashHome = (d) => (d === "control" ? "log" : d === "rider" ? "rider-list" : "admin-list");
+
+  const [dash, setDash] = useState(defaultDash);
+  const [view, setView] = useState(dashHome(defaultDash));
+  const [pendingDB, setPendingDB] = useState([]);
+  const [form, setForm] = useState({ ...EMPTY_CALL });
+  const [hospitals, setHospitals] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [meetups, setMeetups] = useState([]);
+  const [itemPicklist, setItems] = useState([]);
+  const [dutyStatuses, setDutyStatuses] = useState([]);
+  const [itemQuery, setItemQ] = useState("");
+  const [itemSugg, setItemSugg] = useState([]);
+  const [confirmItem, setCI] = useState(null);
+  const [detailId, setDetailId] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [confirmComplete, setConfirmComplete] = useState(false);
+  const [dbLoading, setDbLoading] = useState(false);
+
+  const notify = (msg, color = C.green) => { setToast({ msg, color }); setTimeout(() => setToast(null), 3000); };
+  const selectedCall = pendingDB.find((x) => x.id === detailId) || null;
+
+  useEffect(() => {
+    api("getLists").then((res) => {
+      if (res.hospitals) setHospitals(res.hospitals);
+      if (res.items) setItems(res.items);
+      if (res.meetups) setMeetups(res.meetups);
+      if (res.vehicles) setVehicles(res.vehicles);
+      if (res.dutyStatuses) setDutyStatuses(res.dutyStatuses);
+    }).catch(() => {});
+  }, []);
+
+  const loadCalls = useCallback(async () => {
+    setDbLoading(true);
+    try {
+      const pending = await api("getPendingCalls");
+      setPendingDB(pending.rows || []);
+    } catch { notify("Could not load calls", C.red); }
+    setDbLoading(false);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { loadCalls(); }, [loadCalls]);
+  useEffect(() => { const t = setInterval(loadCalls, 30000); return () => clearInterval(t); }, [loadCalls]);
+
+  const patchCall = async (id, patch) => {
+    setPendingDB((prev) => prev.map((x) => x.id === id ? { ...x, ...patch } : x));
+    try { await api("updateCall", { id, ...patch }); }
+    catch { notify("Sync error — saved locally", C.orange); }
+  };
+  const patchField = (id, k, v) => patchCall(id, { [k]: v });
+
+  const initiateNewCall = () => {
+    const td = nowDate();
+    setForm({ ...EMPTY_CALL, timestamp: nowDT(), riderCalled: nowTime(), transportDate: td, dateCallReceived: td, dateOfCallFromHospital: td, scheduledMeetupDate: td, controllerName: name, meetOtherGroup: [], overrides: {} });
+    setItemQ(""); setItemSugg([]); setCI(null);
+    setView("newcall");
+  };
+
+  const fset = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const ftog = (k, v) => setForm((f) => ({ ...f, [k]: f[k].includes(v) ? f[k].filter((x) => x !== v) : [...f[k], v] }));
+  const handleOverride = (fk, val) => {
+    setForm((f) => {
+      const ov = { ...f.overrides };
+      if (val === null) { delete ov[fk]; return { ...f, overrides: ov }; }
+      return { ...f, [fk]: val, overrides: { ...ov, [fk]: true } };
+    });
+  };
+  useEffect(() => { if (!form.overrides?.dateCallReceived) setForm((f) => ({ ...f, dateCallReceived: f.transportDate })); }, [form.transportDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!itemQuery.trim()) { setItemSugg([]); return; }
+    const q = itemQuery.toLowerCase();
+    setItemSugg(itemPicklist.filter((i) => i.toLowerCase().includes(q) && !form.itemsTransported.includes(i)));
+    setCI(null);
+  }, [itemQuery, itemPicklist, form.itemsTransported]);
+
+  const addItem = () => {
+    const v = itemQuery.trim(); if (!v) return;
+    const match = itemPicklist.find((i) => i.toLowerCase() === v.toLowerCase());
+    if (match) { if (!form.itemsTransported.includes(match)) ftog("itemsTransported", match); setItemQ(""); }
+    else setCI(v);
+  };
+  const confirmAdd = () => {
+    const v = confirmItem;
+    setItems((p) => (p.includes(v) ? p : [...p, v]));
+    setForm((f) => ({ ...f, itemsTransported: [...f.itemsTransported, v] }));
+    setItemQ(""); setCI(null);
+    api("addToList", { sheet: "Items", value: v }).catch(() => {});
+    notify(`"${v}" added to picklist`);
+  };
+
+  const onAddLocation = (v) => {
+    setHospitals((p) => [...p, v].sort());
+    api("addToList", { sheet: "OriginDestination", value: v }).catch(() => {});
+    notify(`"${v}" added`);  };
+
+  const onAddMeetup = (v) => {
+    setMeetups((p) => [...p, v].sort());
+    api("addToList", { sheet: "Meetups", value: v }).catch(() => {});
+    notify(`"${v}" added`);
+  };
+
+  const missingMsg = (head, keys) => head + "\n" + keys.map((k) => "• " + FIELD_LABELS[k]).join("\n");
+
+  const submitCall = async () => {
+    const missing = REQUIRED_CALL_FIELDS.filter((k) => {
+      if (k === "numPackages") return !(Number(form.numPackages) >= 1);
+      return !form[k] || (Array.isArray(form[k]) && !form[k].length);
+    });
+    if (missing.length) { notify(missingMsg("Can't open call — missing required:", missing), C.red); return; }
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const record = { ...form, id, status: "pending-pickup", controllerPhone: session.phone };
+    setPendingDB((prev) => [record, ...prev]);
+    setDetailId(id); setView("detail");
+    notify("Run logged");
+    try { await api("addCall", { record }); }
+    catch { notify("Logged locally — sync error", C.orange); }
+  };
+
+  const triggerPickup = (id) => { patchCall(id, { pickupTime: nowTime(), status: "in-transit" }); notify("Pickup recorded", C.accent); };
+  const triggerDropoff = (id) => { patchCall(id, { meetupTime: nowTime(), deliveryTime: nowTime(), status: "delivered" }); notify("Delivery recorded ✓"); };
+  const triggerRiderHome = (id) => { patchCall(id, { riderHome: nowTime() }); notify("Rider home recorded"); };
+
+  const completeMissing = (call) => COMPLETE_REQUIRED_FIELDS.filter((k) => !call[k] || (Array.isArray(call[k]) && !call[k].length));
+
+  const tryComplete = () => {
+    if (!selectedCall) return;
+    const missing = completeMissing(selectedCall);
+    if (missing.length) { notify(missingMsg("Can't complete — missing required:", missing), C.red); return; }
+    setConfirmComplete(true);
+  };
+
+  const markComplete = async (id) => {
+    const call = pendingDB.find((x) => x.id === id); if (!call) return;
+    const missing = completeMissing(call);
+    if (missing.length) { setConfirmComplete(false); notify(missingMsg("Can't complete — missing required:", missing), C.red); return; }
+    const completedAt = nowDT();
+    setPendingDB((prev) => prev.filter((x) => x.id !== id));
+    setConfirmComplete(false); setView("log");
+    notify("Run completed", C.purple);
+    try { await api("completeCall", { id, completedAt }); }
+    catch { notify("Complete saved locally — sync error", C.orange); }
+  };
+
+  const isControl = dash === "control";
+  const isAdminView = dash === "admin";
+  const hasHeaderActions = isControl || dashboards.length > 1; // is there a row-2 on mobile
+
+  // A run is editable in the admin view only if this admin logged it.
+  const loggedByMe = (rc) => !!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone);
+
+  const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
+
+  // Rider list is filtered to runs assigned to this rider (or unassigned).
+  const isMyRun = (rc) => {
+    const assigned = Array.isArray(rc.riders) ? rc.riders : typeof rc.riders === "string" ? [rc.riders] : [];
+    return assigned.length === 0 || assigned.some((r) => r.trim() === name.trim());
   };
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: 16, maxWidth: 920, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      {confirmItem && (
-        <div style={{ background: C.successBg, border: `1px solid ${C.green}`, borderRadius: 8, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: C.text }}>Add <strong>"{confirmItem}"</strong> to the picklist?</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={confirmAdd} style={{ background: C.green, color: isDark(C) ? "#000" : "#fff", border: "none", borderRadius: 5, padding: "6px 16px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM & ADD</button>
-            <button onClick={() => setCI(null)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button>
+    <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, display: "flex", flexDirection: "column" }}>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      <style>{`
+        .bbw-header{display:flex;align-items:center;gap:8px;height:56px;padding:0 16px;flex-shrink:0}
+        .bbw-brand{order:0;margin-right:auto}
+        .bbw-newcall{order:1}
+        .bbw-toggle{order:2}
+        .bbw-account{order:3}
+        .bbw-break{display:none;order:2}
+        @media (max-width:520px){
+          .bbw-header{height:auto;flex-wrap:wrap;row-gap:8px;padding-top:8px;padding-bottom:8px}
+          .bbw-brand{order:1;margin-right:auto}
+          .bbw-account{order:2}
+          .bbw-break{display:block;order:3;flex-basis:100%;height:0;margin:0}
+          .bbw-newcall{order:4}
+          .bbw-toggle{order:5}
+          .bbw-brand-title{font-size:11px;letter-spacing:1px}
+        }
+      `}</style>
+
+      {toast && <div role="alert" style={{ position: "fixed", top: 16, right: 16, background: toast.color, color: "#fff", padding: "10px 20px", borderRadius: 7, fontSize: 13, zIndex: 9999, boxShadow: "0 4px 24px rgba(0,0,0,0.3)", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "pre-line", maxWidth: 300, lineHeight: 1.6 }}>{toast.msg}</div>}
+
+      {/* Header */}
+      <header className="bbw-header" role="banner" style={{ background: C.panel, borderBottom: `1px solid ${C.border}` }}>
+        <div className="bbw-brand" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <img src="/logo.png" alt="Blood Bike West logo" style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <h1 className="bbw-brand-title" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 2, fontFamily: "'IBM Plex Mono',monospace", color: C.text, whiteSpace: "nowrap", margin: 0 }}>BLOOD BIKE WEST</h1>
+            <div style={{ fontSize: 8, color: C.muted, letterSpacing: 3 }}>COMMAND CENTRE</div>
           </div>
         </div>
+
+        <div className="bbw-account" style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: 11, color: C.text, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+          <button onClick={() => { clearSession(); onLogout(); }} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: "5px 12px", borderRadius: 6, letterSpacing: 1, marginTop: 4 }}>SIGN OUT</button>
+        </div>
+
+        {hasHeaderActions && <div className="bbw-break" />}
+
+        {isControl && <button className="bbw-newcall" onClick={initiateNewCall} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>+ NEW CALL</button>}
+
+        {dashboards.length > 1 && (
+          <div className="bbw-toggle" style={{ display: "flex", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, gap: 3, flexShrink: 0 }}>
+            {dashboards.map(([d, label]) => (
+              <button key={d} onClick={() => { setDash(d); setView(dashHome(d)); }}
+                style={{ background: dash === d ? C.accent : "transparent", color: dash === d ? "#fff" : C.muted, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, fontWeight: 600 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </header>
+
+      {/* Control sub-nav */}
+      {isControl && view !== "newcall" && view !== "detail" && (
+        <nav aria-label="Views" style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, display: "flex", paddingLeft: 8, flexShrink: 0 }}>
+          <NavBtn v="log" view={view} setView={setView} C={C}>RUN LOG</NavBtn>
+          {dbLoading && <div style={{ marginLeft: "auto", padding: "14px 18px", fontSize: 10, color: C.muted, fontFamily: "'IBM Plex Mono',monospace" }}>⟳ syncing…</div>}
+        </nav>
       )}
-      {confirmLeave && (
-        <div style={{ background: C.confirmBg, border: `1px solid ${C.red}`, borderRadius: 8, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: C.text }}>Go back? Unsaved details will be lost.</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onCancel} style={{ background: C.red, color: "#fff", border: "none", borderRadius: 5, padding: "6px 16px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>DISCARD</button>
-            <button onClick={() => setConfirmLeave(false)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>STAY</button>
-          </div>
-        </div>
+
+      {isControl && view === "log" && (
+        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
       )}
-      <button onClick={() => setConfirmLeave(true)} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 10 }}>← BACK</button>
-      <div style={{ fontSize: 10, color: C.muted, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, marginBottom: 18 }}>NEW CALL — * REQUIRED FIELDS</div>
 
-      <Section title="Call Metadata">
-        <Grid cols={2}>
-          <div><Label auto>Timestamp</Label><input aria-label="Timestamp (auto)" value={form.timestamp} readOnly style={{ ...inp(C, false, true), width: "100%" }} /></div>
-          <div><Label>Time of Call from Hospital *</Label><input type="time" aria-label="Time of Call from Hospital" value={form.timeOfCall} onChange={(e) => fset("timeOfCall", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label>Date of Call from Hospital</Label><input type="date" aria-label="Date of Call from Hospital" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label>Controller Name *</Label>
-            <select aria-label="Controller Name" value={form.controllerName} onChange={(e) => fset("controllerName", e.target.value)} style={{ ...sel(C), width: "100%" }}>
-              <option value="">— Select —</option>
-              {controllers.map((ctrl, i) => <option key={i}>{String(ctrl.name || ctrl)}</option>)}
-            </select>
-          </div>
-          <div><Label>Transport Date *</Label><input type="date" aria-label="Transport Date" value={form.transportDate} onChange={(e) => fset("transportDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          <div>
-            <Label auto>Date Call Received</Label>
-            <input type="date" aria-label="Date Call Received" value={form.dateCallReceived} onChange={(e) => fset("dateCallReceived", e.target.value)} style={{ ...inp(C), width: "100%" }} />
-          </div>
-        </Grid>
-      </Section>
+      {isControl && view === "newcall" && (
+        <NewCallForm
+          form={form} fset={fset} ftog={ftog} handleOverride={handleOverride}
+          lists={lists} onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
+          itemQuery={itemQuery} setItemQ={setItemQ} itemSugg={itemSugg} addItem={addItem}
+          confirmItem={confirmItem} setCI={setCI} confirmAdd={confirmAdd}
+          onSubmit={submitCall} onCancel={() => setView("log")}
+        />
+      )}
 
-      <Section title="Route">
-        <Grid cols={1}>
-          <LocationField label="Origin *" value={form.originHospital} onChange={(v) => fset("originHospital", v)} options={hospitals} exclude={[form.destinationHospital]} onAdd={onAddLocation} />
-          <LocationField label="Destination *" value={form.destinationHospital} onChange={(v) => fset("destinationHospital", v)} options={hospitals} exclude={[form.originHospital]} onAdd={onAddLocation} />
-        </Grid>
-      </Section>
+      {isControl && view === "detail" && selectedCall && (
+        <CallDetail
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
+          confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
+          markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("log")}
+        />
+      )}
 
-      <Section title="Items Transported">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
-          {itemPicklist.map((item) => <Chip key={item} active={form.itemsTransported.includes(item)} onClick={() => ftog("itemsTransported", item)}>{form.itemsTransported.includes(item) ? "✓ " : ""}{item}</Chip>)}
-        </div>
-        <div style={{ position: "relative" }}>
-          <Label optional note="type to search or add new">Custom Item</Label>
-          <div style={{ display: "flex", gap: 6 }}>
-            <input aria-label="Item name" value={itemQuery} onChange={(e) => setItemQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} placeholder="Type item name…" style={{ ...inp(C), flex: 1, width: "auto" }} />
-            <button onClick={addItem} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
-          </div>
-          <SuggestionDropdown items={itemSugg} onPick={(s) => { ftog("itemsTransported", s); setItemQ(""); }} right={70} />
-        </div>
-        {form.itemsTransported.length > 0 && <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>{form.itemsTransported.map((i) => <span key={i} style={{ background: C.accent + "22", color: C.accentText, border: `1px solid ${C.accent}44`, borderRadius: 12, padding: "3px 10px", fontSize: 11 }}>{i} <span onClick={() => ftog("itemsTransported", i)} style={{ cursor: "pointer", marginLeft: 4, color: C.red }}>×</span></span>)}</div>}
-        <div style={{ marginTop: 14 }}><Label>Number of Packages *</Label><input type="number" min="1" aria-label="Number of Packages" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120 }} /></div>
-      </Section>
+      {dash === "rider" && view === "rider-list" && (
+        <RiderList active={pendingDB.filter(isMyRun)} onOpen={(id) => { setDetailId(id); setView("rider-detail"); }} />
+      )}
 
-      <Section title="Crew & Vehicle">
-        <Grid cols={1} gap={12}>
-          <div><Label>Rider *</Label>
-            <select aria-label="Rider" value={form.riders[0] || ""} onChange={(e) => fset("riders", e.target.value ? [e.target.value] : [])} style={{ ...sel(C), width: "100%" }}>
-              <option value="">— Select Rider —</option>
-              {riders.map((r, i) => <option key={i}>{String(r.name || r)}</option>)}
-            </select>
-          </div>
-          <div><Label>Rider Duty Status</Label><select aria-label="Rider Duty Status" value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
-          <div><Label>Vehicle Used</Label><select aria-label="Vehicle Used" value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
-          <div>
-            <Label optional>Meet with Other Group</Label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 4 }}>
-              {meetups.map((g) => {
-                const active = Array.isArray(form.meetOtherGroup) && form.meetOtherGroup.includes(g);
-                return <Chip key={g} active={active} onClick={() => {
-                  const cur = Array.isArray(form.meetOtherGroup) ? form.meetOtherGroup : [];
-                  fset("meetOtherGroup", active ? cur.filter((x) => x !== g) : [...cur, g]);
-                }}>{active ? "✓ " : ""}{g}</Chip>;
-              })}
-            </div>
-            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              <input aria-label="Add a new group" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addGroup())} placeholder="Add a new group…" style={{ ...inp(C), flex: 1, width: "auto" }} />
-              <button onClick={addGroup} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
-            </div>
-          </div>
-          <Grid cols={2}>
-            <div><Label optional>Scheduled Meet-up Date</Label><input type="date" aria-label="Scheduled Meet-up Date" value={form.scheduledMeetupDate} onChange={(e) => fset("scheduledMeetupDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-            <div><Label optional>Scheduled Meet-up Time</Label><input type="time" aria-label="Scheduled Meet-up Time" value={form.scheduledMeetupTime} onChange={(e) => fset("scheduledMeetupTime", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          </Grid>
-        </Grid>
-      </Section>
+      {dash === "rider" && view === "rider-detail" && selectedCall && (
+        <RiderDetail
+          call={selectedCall}
+          onBack={() => setView("rider-list")}
+          onPickup={() => triggerPickup(selectedCall.id)}
+          onDropoff={() => triggerDropoff(selectedCall.id)}
+          onRiderHome={() => triggerRiderHome(selectedCall.id)}
+          onNote={(note) => {
+            const updated = (selectedCall.notes ? selectedCall.notes + "\n\n" : "") + `[Rider ${nowDT()}]: ` + note;
+            patchCall(selectedCall.id, { notes: updated });
+          }}
+        />
+      )}
 
-      <Section title="Authorisation">
-        <Label>Green Lights Authorised</Label>
-        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-          {[true, false].map((val) => <button key={String(val)} onClick={() => fset("greenLights", val)} style={{ padding: "8px 24px", borderRadius: 7, border: `1px solid ${form.greenLights === val ? (val ? C.green : C.red) : C.borderHi}`, background: form.greenLights === val ? (val ? C.green + "22" : C.red + "22") : C.card, color: form.greenLights === val ? (val ? C.green : C.red) : C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>{val ? "✓  YES" : "✕  NO"}</button>)}
-        </div>
-      </Section>
+      {isAdminView && view === "admin-list" && (
+        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("admin-detail"); }} onNewCall={null} />
+      )}
 
-      <Section title="Optional Details">
-        <Grid cols={1} gap={12}>
-          <div><Label optional>Contact Name</Label><input aria-label="Contact Name" value={form.contactName} onChange={(e) => fset("contactName", e.target.value)} placeholder="Name of contact" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Contact Phone Number</Label><input type="tel" aria-label="Contact Phone Number" value={form.contactPhone} onChange={(e) => fset("contactPhone", e.target.value)} placeholder="+353…" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Pick-up Address</Label><input aria-label="Pick-up Address" value={form.pickupAddress} onChange={(e) => fset("pickupAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Drop-off Address</Label><input aria-label="Drop-off Address" value={form.dropOffAddress} onChange={(e) => fset("dropOffAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
-        </Grid>
-      </Section>
-
-      <Section title="Timing — Auto-Captured (Override Available)">
-        <Grid cols={2}>
-          <AutoTime label="Rider Called" value={form.riderCalled} fieldKey="riderCalled" overrides={form.overrides} onOverride={handleOverride} note="auto on New Call" />
-          <AutoTime label="Pickup Time" value={form.pickupTime} fieldKey="pickupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Picked Up" />
-          <AutoTime label="Meet-up Time (actual)" value={form.meetupTime} fieldKey="meetupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Dropped Off" />
-          <AutoTime label="Delivery Time" value={form.deliveryTime} fieldKey="deliveryTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Dropped Off" />
-          <AutoTime label="Rider Home" value={form.riderHome} fieldKey="riderHome" overrides={form.overrides} onOverride={handleOverride} note="auto on Rider Home" />
-        </Grid>
-      </Section>
-
-      <Section title="Other Details / Notes">
-        <textarea aria-label="Notes" value={form.notes} onChange={(e) => fset("notes", e.target.value)} rows={3} placeholder="Additional details, special instructions, observations…" style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
-      </Section>
-
-      <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>
-        <button onClick={onSubmit} style={{ flex: 1, background: C.accent, border: "none", color: "#fff", padding: "14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1 }}>LOG CALL & OPEN RUN</button>
-        <button onClick={() => setConfirmLeave(true)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "14px 22px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button>
-      </div>
+      {isAdminView && view === "admin-detail" && selectedCall && (
+        <CallDetail
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
+          confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
+          markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("admin-list")}
+          readOnly={!loggedByMe(selectedCall)}
+        />
+      )}
     </div>
   );
 }
