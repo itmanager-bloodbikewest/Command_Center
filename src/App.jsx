@@ -1,46 +1,18 @@
-import { useState, useEffect } from "react";
-import { ThemeProvider, useC } from "./lib/theme.jsx";
-import { loadSession, clearSession } from "./lib/session.js";
-import { registerPushNotifications } from "./lib/api.js";
-import LoginScreen from "./components/LoginScreen.jsx";
-import MainApp from "./MainApp.jsx";
+import { useC } from "../lib/theme.jsx";
+import { RunGroups } from "../components/RunCard.jsx";
 
-function AppGate() {
+export default function DispatcherLog({ pending, completed, onOpen }) {
   const C = useC();
-  const [session, setSession] = useState(null);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    try {
-      const saved = loadSession();
-      if (saved && saved.role && saved.name) {
-        setSession(saved);
-        if (saved.phone) registerPushNotifications(saved.phone).catch(() => {});
-      } else {
-        clearSession();
-      }
-    } catch {
-      clearSession();
-    }
-    setChecking(false);
-  }, []);
-
-  if (checking)
-    return (
-      <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Mono',monospace", color: C.muted, fontSize: 12, letterSpacing: 2 }}>
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet" />
-        LOADING…
-      </div>
-    );
-
-  if (!session) return <LoginScreen onLogin={setSession} />;
-  return <MainApp session={session} onLogout={() => setSession(null)} />;
-}
-
-export default function App() {
+  const empty = pending.length === 0 && completed.length === 0;
   return (
-    <ThemeProvider>
-      <AppGate />
-    </ThemeProvider>
+    <div style={{ flex: 1, padding: 16, overflowY: "auto" }}>
+      {empty ? (
+        <div style={{ textAlign: "center", paddingTop: 80 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+          <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, letterSpacing: 2, color: C.muted }}>NO RUNS LOGGED TODAY</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Press <strong style={{ color: C.accentText }}>+ NEW CALL</strong> to begin</div>
+        </div>
+      ) : <RunGroups active={pending} completed={completed} onOpen={onOpen} />}
+    </div>
   );
 }

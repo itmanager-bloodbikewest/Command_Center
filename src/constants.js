@@ -1,39 +1,18 @@
-// Shared data constants.
+import { useC } from "../lib/theme.jsx";
+import { RunGroups } from "../components/RunCard.jsx";
 
-export const EMPTY_CALL = {
-  timestamp:"", timeOfCall:"", dateOfCallFromHospital:"", controllerName:"", controllerPhone:"",
-  transportDate:"", dateCallReceived:"",
-  originHospital:"", destinationHospital:"",
-  itemsTransported:[], numPackages:"", riders:[], riderDutyStatus:"",
-  greenLights:false, meetOtherGroup:[], vehicleUsed:"", riderCalled:"", notes:"",
-  contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"",
-  scheduledMeetupDate:"", scheduledMeetupTime:"",
-  pickupTime:"", meetupTime:"", deliveryTime:"", riderHome:"", completedAt:"",
-  overrides:{}, status:"pending-pickup", id:"",
-};
-
-export const STATUS = {
-  "pending-pickup": { label:"Pending Pickup",    colorKey:"orange" },
-  "in-transit":     { label:"In Transit",        colorKey:"accent" },
-  "delivered":      { label:"Delivered",         colorKey:"green" },
-  "complete":       { label:"Transport Complete", colorKey:"purple" },
-};
-
-// Required to OPEN a call (the asterisked fields). numPackages additionally
-// must be >= 1 (validated separately — see submitCall).
-export const REQUIRED_CALL_FIELDS = ["controllerName", "timeOfCall", "transportDate", "originHospital", "destinationHospital", "riders", "numPackages"];
-
-// Required to mark a call COMPLETE (non-asterisked but enforced at completion).
-export const COMPLETE_REQUIRED_FIELDS = ["vehicleUsed"];
-
-// Friendly labels for warning messages.
-export const FIELD_LABELS = {
-  controllerName: "Controller",
-  timeOfCall: "Time of call",
-  transportDate: "Transport date",
-  originHospital: "Origin",
-  destinationHospital: "Destination",
-  riders: "Rider",
-  numPackages: "Number of packages",
-  vehicleUsed: "Vehicle",
-};
+export default function RunLog({ pending, onOpen, onNewCall }) {
+  const C = useC();
+  const empty = pending.length === 0;
+  return (
+    <div style={{ flex: 1, padding: 16, overflowY: "auto" }}>
+      {empty ? (
+        <div style={{ textAlign: "center", paddingTop: 80 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+          <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, letterSpacing: 2, color: C.muted }}>NO RUNS LOGGED TODAY</div>
+          {onNewCall && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Press <button onClick={onNewCall} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: C.accentText, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>+ NEW CALL</button> to begin</div>}
+        </div>
+      ) : <RunGroups active={pending} onOpen={onOpen} />}
+    </div>
+  );
+}

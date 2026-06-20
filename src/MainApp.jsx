@@ -1,309 +1,145 @@
-import { useState, useEffect, useCallback } from "react";
-import { useC } from "./lib/theme.jsx";
-import { api } from "./lib/api.js";
-import { clearSession, normalizePhone } from "./lib/session.js";
-import { nowTime, nowDate, nowDT } from "./lib/datetime.js";
-import { EMPTY_CALL, REQUIRED_CALL_FIELDS, COMPLETE_REQUIRED_FIELDS, FIELD_LABELS } from "./constants.js";
+import { useState, useEffect } from "react";
+import { useC, isDark } from "../lib/theme.jsx";
+import { Section, Badge, inp, sel } from "../ui/primitives.jsx";
+import { fmtDate, fmtTime, fmtDT, nowDT } from "../lib/datetime.js";
+import NotesList from "../components/NotesList.jsx";
 
-import RunLog from "./views/RunLog.jsx";
-import NewCallForm from "./views/NewCallForm.jsx";
-import CallDetail from "./views/CallDetail.jsx";
-import RiderList from "./views/RiderList.jsx";
-import RiderDetail from "./components/RiderDetail.jsx";
-
-const NavBtn = ({ v, children, view, setView, C }) => (
-  <button onClick={() => setView(v)}
-    style={{ background: view === v ? C.navActive : "none", border: "none", borderBottom: `2px solid ${view === v ? C.accent : "transparent"}`, color: view === v ? C.accentText : C.muted, padding: "14px 18px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, whiteSpace: "nowrap" }}>
-    {children}
-  </button>
-);
-
-export default function MainApp({ session, onLogout }) {
+// Lets a controller append a timestamped note to an active run.
+function ControllerNoteBox({ sc, patchField, notify }) {
   const C = useC();
-  const { role, name, controllers, riders } = session;
-
-  // Available dashboards come from explicit flags; fall back to deriving them
-  // from `role` for any older session saved before the flags existed.
-  const canControl = session.isController ?? (role === "controller" || role === "dual user");
-  const canRide    = session.isRider ?? (role === "rider" || role === "dual user");
-  const canAdmin   = session.isAdmin ?? (role === "admin");
-  const dashboards = [
-    canControl && ["control", "CTL"],
-    canRide && ["rider", "RDR"],
-    canAdmin && ["admin", "ADM"],
-  ].filter(Boolean);
-  // Default to control, then rider, then admin (pure admin lands in admin).
-  const defaultDash = canControl ? "control" : canRide ? "rider" : "admin";
-  const dashHome = (d) => (d === "control" ? "log" : d === "rider" ? "rider-list" : "admin-list");
-
-  const [dash, setDash] = useState(defaultDash);
-  const [view, setView] = useState(dashHome(defaultDash));
-  const [pendingDB, setPendingDB] = useState([]);
-  const [form, setForm] = useState({ ...EMPTY_CALL });
-  const [hospitals, setHospitals] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
-  const [meetups, setMeetups] = useState([]);
-  const [itemPicklist, setItems] = useState([]);
-  const [dutyStatuses, setDutyStatuses] = useState([]);
-  const [itemQuery, setItemQ] = useState("");
-  const [itemSugg, setItemSugg] = useState([]);
-  const [confirmItem, setCI] = useState(null);
-  const [detailId, setDetailId] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [confirmComplete, setConfirmComplete] = useState(false);
-  const [dbLoading, setDbLoading] = useState(false);
-
-  const notify = (msg, color = C.green) => { setToast({ msg, color }); setTimeout(() => setToast(null), 3000); };
-  const selectedCall = pendingDB.find((x) => x.id === detailId) || null;
-
-  useEffect(() => {
-    api("getLists").then((res) => {
-      if (res.hospitals) setHospitals(res.hospitals);
-      if (res.items) setItems(res.items);
-      if (res.meetups) setMeetups(res.meetups);
-      if (res.vehicles) setVehicles(res.vehicles);
-      if (res.dutyStatuses) setDutyStatuses(res.dutyStatuses);
-    }).catch(() => {});
-  }, []);
-
-  const loadCalls = useCallback(async () => {
-    setDbLoading(true);
-    try {
-      const pending = await api("getPendingCalls");
-      setPendingDB(pending.rows || []);
-    } catch { notify("Could not load calls", C.red); }
-    setDbLoading(false);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { loadCalls(); }, [loadCalls]);
-  useEffect(() => { const t = setInterval(loadCalls, 30000); return () => clearInterval(t); }, [loadCalls]);
-
-  const patchCall = async (id, patch) => {
-    setPendingDB((prev) => prev.map((x) => x.id === id ? { ...x, ...patch } : x));
-    try { await api("updateCall", { id, ...patch }); }
-    catch { notify("Sync error — saved locally", C.orange); }
+  const [note, setNote] = useState("");
+  const [saved, setSaved] = useState(false);
+  const save = () => {
+    const t = note.trim();
+    if (!t) return;
+    const updated = (sc.notes ? sc.notes + "\n\n" : "") + `[Controller ${nowDT()}]: ` + t;
+    patchField(sc.id, "notes", updated);
+    setNote(""); setSaved(true); setTimeout(() => setSaved(false), 2000);
+    notify("Note added", C.accent);
   };
-  const patchField = (id, k, v) => patchCall(id, { [k]: v });
+  return (
+    <div style={{ marginTop: 12 }}>
+      <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Add a note to this run…"
+        style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.6 }} />
+      <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+        <button onClick={save} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 18px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>ADD NOTE</button>
+        {saved && <span style={{ fontSize: 11, color: C.green, fontFamily: "'IBM Plex Mono',monospace" }}>✓ Added</span>}
+      </div>
+    </div>
+  );
+}
 
-  const initiateNewCall = () => {
-    const td = nowDate();
-    setForm({ ...EMPTY_CALL, timestamp: nowDT(), riderCalled: nowTime(), transportDate: td, dateCallReceived: td, dateOfCallFromHospital: td, scheduledMeetupDate: td, controllerName: name, meetOtherGroup: [], overrides: {} });
-    setItemQ(""); setItemSugg([]); setCI(null);
-    setView("newcall");
-  };
+// Editable / read-only metadata row.
+function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, sc, patchField, notify, isCompleted }) {
+  const C = useC();
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(sc[fieldKey] || "");
+  useEffect(() => setVal(sc[fieldKey] || ""), [sc[fieldKey]]);
+  const save = () => { patchField(sc.id, fieldKey, val); setEditing(false); notify("Saved", C.accent); };
 
-  const fset = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const ftog = (k, v) => setForm((f) => ({ ...f, [k]: f[k].includes(v) ? f[k].filter((x) => x !== v) : [...f[k], v] }));
-  const handleOverride = (fk, val) => {
-    setForm((f) => {
-      const ov = { ...f.overrides };
-      if (val === null) { delete ov[fk]; return { ...f, overrides: ov }; }
-      return { ...f, [fk]: val, overrides: { ...ov, [fk]: true } };
-    });
-  };
-  useEffect(() => { if (!form.overrides?.dateCallReceived) setForm((f) => ({ ...f, dateCallReceived: f.transportDate })); }, [form.transportDate]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!itemQuery.trim()) { setItemSugg([]); return; }
-    const q = itemQuery.toLowerCase();
-    setItemSugg(itemPicklist.filter((i) => i.toLowerCase().includes(q) && !form.itemsTransported.includes(i)));
-    setCI(null);
-  }, [itemQuery, itemPicklist, form.itemsTransported]);
+  if (children || ro)
+    return (
+      <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
+        <div style={{ width: 160, fontSize: 10, color: C.muted, letterSpacing: 1, fontFamily: "'IBM Plex Mono',monospace", flexShrink: 0 }}>{label.toUpperCase()}</div>
+        <div style={{ fontSize: 13, color: C.text, flex: 1 }}>{children || (fmt ? fmt(sc[fieldKey]) : sc[fieldKey]) || "—"}</div>
+      </div>
+    );
+  return (
+    <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
+      <div style={{ width: 160, fontSize: 10, color: C.muted, letterSpacing: 1, fontFamily: "'IBM Plex Mono',monospace", flexShrink: 0 }}>{label.toUpperCase()}</div>
+      {editing
+        ? <div style={{ display: "flex", gap: 6, flex: 1 }}>{options
+            ? <select aria-label={label} value={val} onChange={(e) => setVal(e.target.value)} autoFocus style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
+            : <input aria-label={label} type={type} value={type === "date" ? fmtDate(val) : type === "time" ? fmtTime(val) : val} onChange={(e) => setVal(e.target.value)} autoFocus style={{ ...inp(C, true), flex: 1, width: "auto" }} onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }} />}<button onClick={save} style={{ background: C.green, color: isDark(C) ? "#000" : "#fff", border: "none", borderRadius: 5, padding: "0 12px", cursor: "pointer", fontSize: 11, fontFamily: "'IBM Plex Mono',monospace" }}>SAVE</button><button aria-label="Cancel edit" onClick={() => setEditing(false)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "0 10px", cursor: "pointer", fontSize: 11 }}>✕</button></div>
+        : <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}><span style={{ fontSize: 13, color: val ? C.text : C.muted }}>{fmt ? fmt(val) : val || "—"}</span>{!isCompleted && <button onClick={() => setEditing(true)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 10, fontFamily: "'IBM Plex Mono',monospace" }}>✎ edit</button>}</div>}
+    </div>
+  );
+}
 
-  const addItem = () => {
-    const v = itemQuery.trim(); if (!v) return;
-    const match = itemPicklist.find((i) => i.toLowerCase() === v.toLowerCase());
-    if (match) { if (!form.itemsTransported.includes(match)) ftog("itemsTransported", match); setItemQ(""); }
-    else setCI(v);
-  };
-  const confirmAdd = () => {
-    setItems((p) => [...p, confirmItem]);
-    setForm((f) => ({ ...f, itemsTransported: [...f.itemsTransported, confirmItem] }));
-    setItemQ(""); setCI(null);
-    notify(`"${confirmItem}" added to picklist`);
-  };
+// Timing value with inline override.
+function TimingRow({ label, fieldKey, note, sc, allCalls, patchField, notify, isCompleted }) {
+  const C = useC();
+  const val = allCalls.find((x) => x.id === sc.id)?.[fieldKey] || "";
+  const [ov, setOv] = useState(false);
+  const [ovVal, setOvVal] = useState(val);
+  useEffect(() => setOvVal(val), [val]);
+  const saveOv = () => { patchField(sc.id, fieldKey, ovVal); setOv(false); notify("Override saved", C.accent); };
+  return (
+    <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
+      <div style={{ width: 160, fontSize: 10, color: C.muted, letterSpacing: 1, fontFamily: "'IBM Plex Mono',monospace", flexShrink: 0 }}>{label.toUpperCase()}</div>
+      {ov
+        ? <div style={{ display: "flex", gap: 6, flex: 1 }}><input aria-label={`${label} override`} type="time" value={ovVal} onChange={(e) => setOvVal(e.target.value)} autoFocus style={{ ...inp(C, true), width: 120 }} /><button onClick={saveOv} style={{ background: C.green, color: isDark(C) ? "#000" : "#fff", border: "none", borderRadius: 5, padding: "0 12px", cursor: "pointer", fontSize: 11, fontFamily: "'IBM Plex Mono',monospace" }}>SAVE</button><button aria-label="Cancel override" onClick={() => setOv(false)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "0 10px", cursor: "pointer", fontSize: 11 }}>✕</button></div>
+        : <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}><span style={{ fontSize: 14, fontWeight: 600, fontFamily: "'IBM Plex Mono',monospace", color: val ? C.text : C.borderHi }}>{val ? fmtTime(val) : "pending…"}</span>{val && <span style={{ fontSize: 9, color: C.green, background: C.green + "22", padding: "1px 6px", borderRadius: 8 }}>RECORDED</span>}{note && !val && <span style={{ fontSize: 9, color: C.muted, fontStyle: "italic" }}>{note}</span>}{!isCompleted && <button onClick={() => setOv(true)} style={{ marginLeft: "auto", background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 10, fontFamily: "'IBM Plex Mono',monospace" }}>✎ override</button>}</div>}
+    </div>
+  );
+}
 
-  const onAddLocation = (v) => {
-    setHospitals((p) => [...p, v].sort());
-    api("addToList", { sheet: "OriginDestination", value: v }).catch(() => {});
-    notify(`"${v}" added`);  };
-
-  const onAddMeetup = (v) => {
-    setMeetups((p) => [...p, v].sort());
-    api("addToList", { sheet: "Meetups", value: v }).catch(() => {});
-    notify(`"${v}" added`);
-  };
-
-  const missingMsg = (head, keys) => head + "\n" + keys.map((k) => "• " + FIELD_LABELS[k]).join("\n");
-
-  const submitCall = async () => {
-    const missing = REQUIRED_CALL_FIELDS.filter((k) => {
-      if (k === "numPackages") return !(Number(form.numPackages) >= 1);
-      return !form[k] || (Array.isArray(form[k]) && !form[k].length);
-    });
-    if (missing.length) { notify(missingMsg("Can't open call — missing required:", missing), C.red); return; }
-    const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const record = { ...form, id, status: "pending-pickup", controllerPhone: session.phone };
-    setPendingDB((prev) => [record, ...prev]);
-    setDetailId(id); setView("detail");
-    notify("Run logged");
-    try { await api("addCall", { record }); }
-    catch { notify("Logged locally — sync error", C.orange); }
-  };
-
-  const triggerPickup = (id) => { patchCall(id, { pickupTime: nowTime(), status: "in-transit" }); notify("Pickup recorded", C.accent); };
-  const triggerDropoff = (id) => { patchCall(id, { meetupTime: nowTime(), deliveryTime: nowTime(), status: "delivered" }); notify("Delivery recorded ✓"); };
-  const triggerRiderHome = (id) => { patchCall(id, { riderHome: nowTime() }); notify("Rider home recorded"); };
-
-  const completeMissing = (call) => COMPLETE_REQUIRED_FIELDS.filter((k) => !call[k] || (Array.isArray(call[k]) && !call[k].length));
-
-  const tryComplete = () => {
-    if (!selectedCall) return;
-    const missing = completeMissing(selectedCall);
-    if (missing.length) { notify(missingMsg("Can't complete — missing required:", missing), C.red); return; }
-    setConfirmComplete(true);
-  };
-
-  const markComplete = async (id) => {
-    const call = pendingDB.find((x) => x.id === id); if (!call) return;
-    const missing = completeMissing(call);
-    if (missing.length) { setConfirmComplete(false); notify(missingMsg("Can't complete — missing required:", missing), C.red); return; }
-    const completedAt = nowDT();
-    setPendingDB((prev) => prev.filter((x) => x.id !== id));
-    setConfirmComplete(false); setView("log");
-    notify("Run completed", C.purple);
-    try { await api("completeCall", { id, completedAt }); }
-    catch { notify("Complete saved locally — sync error", C.orange); }
-  };
-
-  const isControl = dash === "control";
-  const isAdminView = dash === "admin";
-  const hasHeaderActions = isControl || dashboards.length > 1; // is there a row-2 on mobile
-
-  // A run is editable in the admin view only if this admin logged it.
-  const loggedByMe = (rc) => !!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone);
-
-  const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
-
-  // Rider list is filtered to runs assigned to this rider (or unassigned).
-  const isMyRun = (rc) => {
-    const assigned = Array.isArray(rc.riders) ? rc.riders : typeof rc.riders === "string" ? [rc.riders] : [];
-    return assigned.length === 0 || assigned.some((r) => r.trim() === name.trim());
-  };
+export default function CallDetail({ sc, allCalls, patchField, notify, vehicles = [], confirmComplete, setConfirmComplete, markComplete, onTryComplete, onBack, readOnly = false }) {
+  const C = useC();
+  const isCompleted = sc.status === "complete";
+  const locked = isCompleted || readOnly; // no editing affordances when locked
+  const rowCtx = { sc, patchField, notify, isCompleted: locked };
+  const timeCtx = { sc, allCalls, patchField, notify, isCompleted: locked };
 
   return (
-    <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, display: "flex", flexDirection: "column" }}>
-      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <style>{`
-        .bbw-header{display:flex;align-items:center;gap:8px;height:56px;padding:0 16px;flex-shrink:0}
-        .bbw-brand{order:0;margin-right:auto}
-        .bbw-newcall{order:1}
-        .bbw-toggle{order:2}
-        .bbw-account{order:3}
-        .bbw-break{display:none;order:2}
-        @media (max-width:520px){
-          .bbw-header{height:auto;flex-wrap:wrap;row-gap:8px;padding-top:8px;padding-bottom:8px}
-          .bbw-brand{order:1;margin-right:auto}
-          .bbw-account{order:2}
-          .bbw-break{display:block;order:3;flex-basis:100%;height:0;margin:0}
-          .bbw-newcall{order:4}
-          .bbw-toggle{order:5}
-          .bbw-brand-title{font-size:11px;letter-spacing:1px}
-        }
-      `}</style>
-
-      {toast && <div role="alert" style={{ position: "fixed", top: 16, right: 16, background: toast.color, color: "#fff", padding: "10px 20px", borderRadius: 7, fontSize: 13, zIndex: 9999, boxShadow: "0 4px 24px rgba(0,0,0,0.3)", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "pre-line", maxWidth: 300, lineHeight: 1.6 }}>{toast.msg}</div>}
-
-      {/* Header */}
-      <div className="bbw-header" style={{ background: C.panel, borderBottom: `1px solid ${C.border}` }}>
-        <div className="bbw-brand" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <img src="/logo.png" alt="Blood Bike West logo" style={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }} />
-          <div style={{ minWidth: 0 }}>
-            <div className="bbw-brand-title" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 2, fontFamily: "'IBM Plex Mono',monospace", color: C.text, whiteSpace: "nowrap" }}>BLOOD BIKE WEST</div>
-            <div style={{ fontSize: 8, color: C.muted, letterSpacing: 3 }}>COMMAND CENTRE</div>
-          </div>
+    <div style={{ flex: 1, overflowY: "auto", padding: 16, maxWidth: 900, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      {readOnly && !isCompleted && (
+        <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 11, color: C.muted, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>
+          👁  READ-ONLY — admin view. You can view this run but not edit it.
         </div>
-
-        <div className="bbw-account" style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 11, color: C.text, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-          <button onClick={() => { clearSession(); onLogout(); }} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: "5px 12px", borderRadius: 6, letterSpacing: 1, marginTop: 4 }}>SIGN OUT</button>
-        </div>
-
-        {hasHeaderActions && <div className="bbw-break" />}
-
-        {isControl && <button className="bbw-newcall" onClick={initiateNewCall} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>+ NEW CALL</button>}
-
-        {dashboards.length > 1 && (
-          <div className="bbw-toggle" style={{ display: "flex", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, gap: 3, flexShrink: 0 }}>
-            {dashboards.map(([d, label]) => (
-              <button key={d} onClick={() => { setDash(d); setView(dashHome(d)); }}
-                style={{ background: dash === d ? C.accent : "transparent", color: dash === d ? "#fff" : C.muted, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, fontWeight: 600 }}>
-                {label}
-              </button>
-            ))}
-          </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, gap: 12 }}>
+        <div><button onClick={onBack} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 6 }}>← BACK TO LOG</button><div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace", color: isCompleted ? C.purple : C.accentText }}>{sc.originHospital} → {sc.destinationHospital}</div><div style={{ marginTop: 6 }}><Badge s={sc.status} /></div>{isCompleted && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Completed {sc.completedAt}</div>}</div>
+        {!locked && (!confirmComplete
+          ? <button onClick={onTryComplete} style={{ background: C.purple, border: "none", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, boxShadow: `0 0 20px ${C.purple}44`, flexShrink: 0 }}>✓ MARK COMPLETE</button>
+          : <div style={{ background: C.confirmBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: "14px 18px", textAlign: "center", minWidth: 200 }}><div style={{ fontSize: 12, color: C.text, marginBottom: 10, fontFamily: "'IBM Plex Mono',monospace" }}>Move to Completed Calls?</div><div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>This will archive the record.</div><div style={{ display: "flex", gap: 8 }}><button onClick={() => markComplete(sc.id)} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button><button onClick={() => setConfirmComplete(false)} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button></div></div>
         )}
       </div>
-
-      {/* Control sub-nav */}
-      {isControl && view !== "newcall" && view !== "detail" && (
-        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, display: "flex", paddingLeft: 8, flexShrink: 0 }}>
-          <NavBtn v="log" view={view} setView={setView} C={C}>RUN LOG</NavBtn>
-          {dbLoading && <div style={{ marginLeft: "auto", padding: "14px 18px", fontSize: 10, color: C.muted, fontFamily: "'IBM Plex Mono',monospace" }}>⟳ syncing…</div>}
-        </div>
+      <Section title="Call Metadata">
+        <EditRow {...rowCtx} label="Timestamp" readOnly><span>{fmtDT(sc.timestamp)}</span></EditRow>
+        <EditRow {...rowCtx} label="Time of Call" fieldKey="timeOfCall" type="time" fmt={fmtTime} />
+        <EditRow {...rowCtx} label="Date of Call" fieldKey="dateOfCallFromHospital" type="date" fmt={fmtDate} />
+        <EditRow {...rowCtx} label="Controller" fieldKey="controllerName" />
+        <EditRow {...rowCtx} label="Transport Date" fieldKey="transportDate" type="date" fmt={fmtDate} />
+        <EditRow {...rowCtx} label="Date Call Received" fieldKey="dateCallReceived" type="date" fmt={fmtDate} />
+        <EditRow {...rowCtx} label="Rider Called" readOnly><span style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{fmtTime(sc.riderCalled)}</span></EditRow>
+      </Section>
+      <Section title="Route">
+        <EditRow {...rowCtx} label="Origin" readOnly><span>{sc.originHospital}</span></EditRow>
+        <EditRow {...rowCtx} label="Destination" readOnly><span>{sc.destinationHospital}</span></EditRow>
+        <EditRow {...rowCtx} label="Items" readOnly><span>{Array.isArray(sc.itemsTransported) ? sc.itemsTransported.join(", ") : sc.itemsTransported || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="No. of Packages" fieldKey="numPackages" type="number" />
+      </Section>
+      {(sc.contactName || sc.contactPhone || sc.pickupAddress || sc.dropOffAddress) && (
+        <Section title="Contact">
+          {sc.contactName && <EditRow {...rowCtx} label="Contact Name" fieldKey="contactName" />}
+          {sc.contactPhone && <EditRow {...rowCtx} label="Contact Phone" fieldKey="contactPhone" type="tel" />}
+          {sc.pickupAddress && <EditRow {...rowCtx} label="Pick-up Address" fieldKey="pickupAddress" />}
+          {sc.dropOffAddress && <EditRow {...rowCtx} label="Drop-off Address" fieldKey="dropOffAddress" />}
+        </Section>
       )}
-
-      {isControl && view === "log" && (
-        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
-      )}
-
-      {isControl && view === "newcall" && (
-        <NewCallForm
-          form={form} fset={fset} ftog={ftog} handleOverride={handleOverride}
-          lists={lists} onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
-          itemQuery={itemQuery} setItemQ={setItemQ} itemSugg={itemSugg} addItem={addItem}
-          confirmItem={confirmItem} setCI={setCI} confirmAdd={confirmAdd}
-          onSubmit={submitCall} onCancel={() => setView("log")}
-        />
-      )}
-
-      {isControl && view === "detail" && selectedCall && (
-        <CallDetail
-          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
-          confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
-          markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("log")}
-        />
-      )}
-
-      {dash === "rider" && view === "rider-list" && (
-        <RiderList active={pendingDB.filter(isMyRun)} onOpen={(id) => { setDetailId(id); setView("rider-detail"); }} />
-      )}
-
-      {dash === "rider" && view === "rider-detail" && selectedCall && (
-        <RiderDetail
-          call={selectedCall}
-          onBack={() => setView("rider-list")}
-          onPickup={() => triggerPickup(selectedCall.id)}
-          onDropoff={() => triggerDropoff(selectedCall.id)}
-          onRiderHome={() => triggerRiderHome(selectedCall.id)}
-          onNote={(note) => {
-            const updated = (selectedCall.notes ? selectedCall.notes + "\n\n" : "") + `[Rider ${nowDT()}]: ` + note;
-            patchCall(selectedCall.id, { notes: updated });
-          }}
-        />
-      )}
-
-      {isAdminView && view === "admin-list" && (
-        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("admin-detail"); }} onNewCall={null} />
-      )}
-
-      {isAdminView && view === "admin-detail" && selectedCall && (
-        <CallDetail
-          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
-          confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
-          markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("admin-list")}
-          readOnly={!loggedByMe(selectedCall)}
-        />
-      )}
+      <Section title="Crew & Vehicle">
+        <EditRow {...rowCtx} label="Rider(s)" readOnly><span>{Array.isArray(sc.riders) ? sc.riders.join(", ") : sc.riders || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="Duty Status" readOnly><span>{sc.riderDutyStatus || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicles} />
+        <EditRow {...rowCtx} label="Meet Other Group" readOnly><span>{Array.isArray(sc.meetOtherGroup) ? sc.meetOtherGroup.join(", ") || "—" : sc.meetOtherGroup || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="Meet-up Date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate} />
+        <EditRow {...rowCtx} label="Meet-up Time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
+        <EditRow {...rowCtx} label="Green Lights" readOnly><span style={{ color: sc.greenLights === true ? C.green : sc.greenLights === false ? C.red : C.muted }}>{sc.greenLights === true ? "✓ YES" : sc.greenLights === false ? "✕ NO" : "—"}</span></EditRow>
+      </Section>
+      <Section title="Timing Log">
+        <TimingRow {...timeCtx} label="Rider Called" fieldKey="riderCalled" />
+        <TimingRow {...timeCtx} label="Pickup Time" fieldKey="pickupTime" note="triggers on rider Picked Up" />
+        <EditRow {...rowCtx} label="Scheduled Meet-up" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
+        <TimingRow {...timeCtx} label="Actual Meet-up" fieldKey="meetupTime" note="triggers on rider Dropped Off" />
+        <TimingRow {...timeCtx} label="Delivery Time" fieldKey="deliveryTime" note="triggers on rider Dropped Off" />
+        <TimingRow {...timeCtx} label="Rider Home" fieldKey="riderHome" note="triggers on rider Rider Home" />
+        {isCompleted && <TimingRow {...timeCtx} label="Completed At" fieldKey="completedAt" />}
+      </Section>
+      <Section title="Notes">
+        <NotesList notes={sc.notes} />
+        {!locked && <ControllerNoteBox sc={sc} patchField={patchField} notify={notify} />}
+      </Section>
     </div>
   );
 }
