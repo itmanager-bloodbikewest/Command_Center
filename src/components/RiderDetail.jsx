@@ -38,7 +38,7 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
         <button onClick={onBack} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 6 }}>← BACK</button>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 16, color: C.accentText, fontWeight: 700 }}>{c.id}</div>
+            <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 16, color: C.accentText, fontWeight: 700 }}>{c.originHospital} → {c.destinationHospital}</div>
             <div style={{ marginTop: 4 }}><Badge s={c.status} /></div>
           </div>
           {c.greenLights === true && (

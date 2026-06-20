@@ -25,7 +25,6 @@ export default function MainApp({ session, onLogout }) {
   const [dash, setDash] = useState(role === "rider" ? "rider" : "control");
   const [view, setView] = useState(role === "rider" ? "rider-list" : "log");
   const [pendingDB, setPendingDB] = useState([]);
-  const [completedDB, setCompletedDB] = useState([]);
   const [form, setForm] = useState({ ...EMPTY_CALL });
   const [hospitals, setHospitals] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -41,8 +40,7 @@ export default function MainApp({ session, onLogout }) {
   const [dbLoading, setDbLoading] = useState(false);
 
   const notify = (msg, color = C.green) => { setToast({ msg, color }); setTimeout(() => setToast(null), 3000); };
-  const allCalls = [...pendingDB, ...completedDB];
-  const selectedCall = allCalls.find((x) => x.id === detailId) || null;
+  const selectedCall = pendingDB.find((x) => x.id === detailId) || null;
 
   useEffect(() => {
     api("getLists").then((res) => {
@@ -57,9 +55,8 @@ export default function MainApp({ session, onLogout }) {
   const loadCalls = useCallback(async () => {
     setDbLoading(true);
     try {
-      const [pending, completed] = await Promise.all([api("getPendingCalls"), api("getCompletedCalls")]);
+      const pending = await api("getPendingCalls");
       setPendingDB(pending.rows || []);
-      setCompletedDB(completed.rows || []);
     } catch { notify("Could not load calls", C.red); }
     setDbLoading(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -69,7 +66,6 @@ export default function MainApp({ session, onLogout }) {
 
   const patchCall = async (id, patch) => {
     setPendingDB((prev) => prev.map((x) => x.id === id ? { ...x, ...patch } : x));
-    setCompletedDB((prev) => prev.map((x) => x.id === id ? { ...x, ...patch } : x));
     try { await api("updateCall", { id, ...patch }); }
     catch { notify("Sync error — saved locally", C.orange); }
   };
@@ -121,11 +117,11 @@ export default function MainApp({ session, onLogout }) {
   const submitCall = async () => {
     const missing = REQUIRED_CALL_FIELDS.filter((k) => !form[k] || (Array.isArray(form[k]) && !form[k].length));
     if (missing.length) { notify("Please complete all required fields", C.red); return; }
-    const id = `RUN-${String(pendingDB.length + completedDB.length + 1).padStart(4, "0")}`;
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     const record = { ...form, id, status: "pending-pickup" };
     setPendingDB((prev) => [record, ...prev]);
     setDetailId(id); setView("detail");
-    notify(`${id} logged`);
+    notify("Run logged");
     try { await api("addCall", { record }); }
     catch { notify("Logged locally — sync error", C.orange); }
   };
@@ -138,9 +134,8 @@ export default function MainApp({ session, onLogout }) {
     const call = pendingDB.find((x) => x.id === id); if (!call) return;
     const completedAt = nowDT();
     setPendingDB((prev) => prev.filter((x) => x.id !== id));
-    setCompletedDB((prev) => [{ ...call, status: "complete", completedAt }, ...prev]);
     setConfirmComplete(false); setView("log");
-    notify(`${id} → Completed`, C.purple);
+    notify("Run completed", C.purple);
     try { await api("completeCall", { id, completedAt }); }
     catch { notify("Complete saved locally — sync error", C.orange); }
   };
@@ -198,7 +193,7 @@ export default function MainApp({ session, onLogout }) {
       )}
 
       {isControl && view === "log" && (
-        <RunLog pending={pendingDB} completed={completedDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} />
+        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} />
       )}
 
       {isControl && view === "newcall" && (
@@ -213,14 +208,14 @@ export default function MainApp({ session, onLogout }) {
 
       {isControl && view === "detail" && selectedCall && (
         <CallDetail
-          sc={selectedCall} allCalls={allCalls} patchField={patchField} notify={notify}
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify}
           confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
           markComplete={markComplete} onBack={() => setView("log")}
         />
       )}
 
       {!isControl && view === "rider-list" && (
-        <RiderList active={pendingDB.filter(isMyRun)} completed={completedDB.filter(isMyRun)} onOpen={(id) => { setDetailId(id); setView("rider-detail"); }} />
+        <RiderList active={pendingDB.filter(isMyRun)} onOpen={(id) => { setDetailId(id); setView("rider-detail"); }} />
       )}
 
       {!isControl && view === "rider-detail" && selectedCall && (
