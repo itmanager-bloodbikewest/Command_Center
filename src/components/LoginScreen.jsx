@@ -18,7 +18,7 @@ export default function LoginScreen({ onLogin }) {
     try {
       const res = await api("getUserRole", { phone: normalized });
       if (!res.found) { setErrMsg("Phone number not recognised. Please contact your administrator."); setLoading(false); return; }
-      const session = { phone: normalized, role: res.role, name: res.name, controllers: res.controllers || [], riders: res.riders || [] };
+      const session = { phone: normalized, role: res.role, name: res.name, controllers: res.controllers || [], riders: res.riders || [], isController: !!res.isController, isRider: !!res.isRider, isAdmin: !!res.isAdmin };
       saveSession(session);
       onLogin(session);
       registerPushNotifications(normalized).catch(() => {});
