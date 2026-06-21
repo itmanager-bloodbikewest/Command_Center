@@ -175,10 +175,10 @@ export default function MainApp({ session, onLogout }) {
 
   const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
 
-  // Rider list is filtered to runs assigned to this rider (or unassigned).
+  // Rider sees only runs where they were selected (active runs always have a rider).
   const isMyRun = (rc) => {
     const assigned = Array.isArray(rc.riders) ? rc.riders : typeof rc.riders === "string" ? [rc.riders] : [];
-    return assigned.length === 0 || assigned.some((r) => r.trim() === name.trim());
+    return assigned.some((r) => r.trim() === name.trim());
   };
 
   return (
@@ -244,7 +244,7 @@ export default function MainApp({ session, onLogout }) {
       )}
 
       {isControl && view === "log" && (
-        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
+        <RunLog pending={pendingDB.filter(loggedByMe)} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
       )}
 
       {isControl && view === "newcall" && (
