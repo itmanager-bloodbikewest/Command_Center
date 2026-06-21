@@ -50,19 +50,19 @@ export default function NewCallForm({
 
       <Section title="Call Metadata">
         <Grid cols={2}>
-          <div><Label auto>Timestamp</Label><input value={form.timestamp} readOnly style={{ ...inp(C, false, true), width: "100%" }} /></div>
-          <div><Label>Time of Call from Hospital *</Label><input type="time" value={form.timeOfCall} onChange={(e) => fset("timeOfCall", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label note="defaults to today">Date of Call from Hospital</Label><input type="date" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label auto>Timestamp</Label><input aria-label="Timestamp (auto)" value={form.timestamp} readOnly style={{ ...inp(C, false, true), width: "100%" }} /></div>
+          <div><Label>Time of Call from Hospital *</Label><input type="time" aria-label="Time of Call from Hospital" value={form.timeOfCall} onChange={(e) => fset("timeOfCall", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label>Date of Call from Hospital</Label><input type="date" aria-label="Date of Call from Hospital" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
           <div><Label>Controller Name *</Label>
-            <select value={form.controllerName} onChange={(e) => fset("controllerName", e.target.value)} style={{ ...sel(C), width: "100%" }}>
+            <select aria-label="Controller Name" value={form.controllerName} onChange={(e) => fset("controllerName", e.target.value)} style={{ ...sel(C), width: "100%" }}>
               <option value="">— Select —</option>
               {controllers.map((ctrl, i) => <option key={i}>{String(ctrl.name || ctrl)}</option>)}
             </select>
           </div>
-          <div><Label>Transport Date *</Label><input type="date" value={form.transportDate} onChange={(e) => fset("transportDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label>Transport Date *</Label><input type="date" aria-label="Transport Date" value={form.transportDate} onChange={(e) => fset("transportDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
           <div>
-            <Label auto note="syncs to transport date">Date Call Received</Label>
-            <input type="date" value={form.dateCallReceived} onChange={(e) => fset("dateCallReceived", e.target.value)} style={{ ...inp(C), width: "100%" }} />
+            <Label auto>Date Call Received</Label>
+            <input type="date" aria-label="Date Call Received" value={form.dateCallReceived} onChange={(e) => fset("dateCallReceived", e.target.value)} style={{ ...inp(C), width: "100%" }} />
           </div>
         </Grid>
       </Section>
@@ -81,27 +81,27 @@ export default function NewCallForm({
         <div style={{ position: "relative" }}>
           <Label optional note="type to search or add new">Custom Item</Label>
           <div style={{ display: "flex", gap: 6 }}>
-            <input value={itemQuery} onChange={(e) => setItemQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} placeholder="Type item name…" style={{ ...inp(C), flex: 1, width: "auto" }} />
+            <input aria-label="Item name" value={itemQuery} onChange={(e) => setItemQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} placeholder="Type item name…" style={{ ...inp(C), flex: 1, width: "auto" }} />
             <button onClick={addItem} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
           </div>
           <SuggestionDropdown items={itemSugg} onPick={(s) => { ftog("itemsTransported", s); setItemQ(""); }} right={70} />
         </div>
         {form.itemsTransported.length > 0 && <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>{form.itemsTransported.map((i) => <span key={i} style={{ background: C.accent + "22", color: C.accentText, border: `1px solid ${C.accent}44`, borderRadius: 12, padding: "3px 10px", fontSize: 11 }}>{i} <span onClick={() => ftog("itemsTransported", i)} style={{ cursor: "pointer", marginLeft: 4, color: C.red }}>×</span></span>)}</div>}
-        <div style={{ marginTop: 14 }}><Label>Number of Packages *</Label><input type="number" min="1" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120 }} /></div>
+        <div style={{ marginTop: 14 }}><Label>Number of Packages *</Label><input type="number" min="1" aria-label="Number of Packages" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120 }} /></div>
       </Section>
 
       <Section title="Crew & Vehicle">
         <Grid cols={1} gap={12}>
           <div><Label>Rider *</Label>
-            <select value={form.riders[0] || ""} onChange={(e) => fset("riders", e.target.value ? [e.target.value] : [])} style={{ ...sel(C), width: "100%" }}>
+            <select aria-label="Rider" value={form.riders[0] || ""} onChange={(e) => fset("riders", e.target.value ? [e.target.value] : [])} style={{ ...sel(C), width: "100%" }}>
               <option value="">— Select Rider —</option>
               {riders.map((r, i) => <option key={i}>{String(r.name || r)}</option>)}
             </select>
           </div>
-          <div><Label>Rider Duty Status</Label><select value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
-          <div><Label>Vehicle Used</Label><select value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
+          <div><Label>Rider Duty Status</Label><select aria-label="Rider Duty Status" value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
+          <div><Label>Vehicle Used</Label><select aria-label="Vehicle Used" value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
           <div>
-            <Label>Meet with Other Group</Label>
+            <Label optional>Meet with Other Group</Label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 4 }}>
               {meetups.map((g) => {
                 const active = Array.isArray(form.meetOtherGroup) && form.meetOtherGroup.includes(g);
@@ -112,13 +112,13 @@ export default function NewCallForm({
               })}
             </div>
             <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              <input value={newGroup} onChange={(e) => setNewGroup(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addGroup())} placeholder="Add a new group…" style={{ ...inp(C), flex: 1, width: "auto" }} />
+              <input aria-label="Add a new group" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addGroup())} placeholder="Add a new group…" style={{ ...inp(C), flex: 1, width: "auto" }} />
               <button onClick={addGroup} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
             </div>
           </div>
           <Grid cols={2}>
-            <div><Label optional>Scheduled Meet-up Date</Label><input type="date" value={form.scheduledMeetupDate} onChange={(e) => fset("scheduledMeetupDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-            <div><Label optional>Scheduled Meet-up Time</Label><input type="time" value={form.scheduledMeetupTime} onChange={(e) => fset("scheduledMeetupTime", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+            <div><Label optional>Scheduled Meet-up Date</Label><input type="date" aria-label="Scheduled Meet-up Date" value={form.scheduledMeetupDate} onChange={(e) => fset("scheduledMeetupDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+            <div><Label optional>Scheduled Meet-up Time</Label><input type="time" aria-label="Scheduled Meet-up Time" value={form.scheduledMeetupTime} onChange={(e) => fset("scheduledMeetupTime", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
           </Grid>
         </Grid>
       </Section>
@@ -132,10 +132,10 @@ export default function NewCallForm({
 
       <Section title="Optional Details">
         <Grid cols={1} gap={12}>
-          <div><Label optional>Contact Name</Label><input value={form.contactName} onChange={(e) => fset("contactName", e.target.value)} placeholder="Name of contact" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Contact Phone Number</Label><input type="tel" value={form.contactPhone} onChange={(e) => fset("contactPhone", e.target.value)} placeholder="+353…" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Pick-up Address</Label><input value={form.pickupAddress} onChange={(e) => fset("pickupAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Drop-off Address</Label><input value={form.dropOffAddress} onChange={(e) => fset("dropOffAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label optional>Contact Name</Label><input aria-label="Contact Name" value={form.contactName} onChange={(e) => fset("contactName", e.target.value)} placeholder="Name of contact" style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label optional>Contact Phone Number</Label><input type="tel" aria-label="Contact Phone Number" value={form.contactPhone} onChange={(e) => fset("contactPhone", e.target.value)} placeholder="+353…" style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label optional>Pick-up Address</Label><input aria-label="Pick-up Address" value={form.pickupAddress} onChange={(e) => fset("pickupAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label optional>Drop-off Address</Label><input aria-label="Drop-off Address" value={form.dropOffAddress} onChange={(e) => fset("dropOffAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
         </Grid>
       </Section>
 
@@ -150,7 +150,7 @@ export default function NewCallForm({
       </Section>
 
       <Section title="Other Details / Notes">
-        <textarea value={form.notes} onChange={(e) => fset("notes", e.target.value)} rows={3} placeholder="Additional details, special instructions, observations…" style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
+        <textarea aria-label="Notes" value={form.notes} onChange={(e) => fset("notes", e.target.value)} rows={3} placeholder="Additional details, special instructions, observations…" style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
       </Section>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>
