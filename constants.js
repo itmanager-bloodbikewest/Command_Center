@@ -1,60 +1,39 @@
-import { useState } from "react";
 import { useC } from "../lib/theme.jsx";
-import { Label, inp } from "../ui/primitives.jsx";
-import { isDark } from "../lib/theme.jsx";
-import { api, registerPushNotifications } from "../lib/api.js";
-import { normalizePhone, saveSession } from "../lib/session.js";
+import { Badge } from "../ui/primitives.jsx";
+import { fmtDT } from "../lib/datetime.js";
 
-export default function LoginScreen({ onLogin }) {
+export function RunCard({ rc, onClickView }) {
   const C = useC();
-  const [phone, setPhone] = useState("");
-  const [errMsg, setErrMsg] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async () => {
-    const normalized = normalizePhone(phone);
-    if (!normalized) { setErrMsg("Please enter your phone number."); return; }
-    setLoading(true); setErrMsg("");
-    try {
-      const res = await api("getUserRole", { phone: normalized });
-      if (!res.found) { setErrMsg("Phone number not recognised. Please contact your administrator."); setLoading(false); return; }
-      const session = { phone: normalized, role: res.role, name: res.name, controllers: res.controllers || [], riders: res.riders || [], isController: !!res.isController, isRider: !!res.isRider, isAdmin: !!res.isAdmin };
-      saveSession(session);
-      onLogin(session);
-      registerPushNotifications(normalized).catch(() => {});
-    } catch {
-      setErrMsg("Could not connect to server. Please try again.");
-    }
-    setLoading(false);
-  };
-
+  const done = rc.status === "complete";
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'IBM Plex Sans',sans-serif" }}>
-      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div style={{ textAlign: "center", marginBottom: 40 }}>
-        <img src="/logo.png" alt="Blood Bike West" style={{ width: 80, marginBottom: 8 }} />
-        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, fontFamily: "'IBM Plex Mono',monospace", color: C.text, margin: 0 }}>BLOOD BIKE WEST</h1>
-        <div style={{ fontSize: 10, color: C.muted, letterSpacing: 4, marginTop: 2 }}>COMMAND CENTRE</div>
+    <div onClick={onClickView}
+      style={{ background: done ? C.completedBg : C.card, border: `1px solid ${done ? C.border : C.borderHi}`, borderRadius: 10, padding: "13px 18px", marginBottom: 8, cursor: "pointer", opacity: done ? 0.85 : 1 }}
+      onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.borderColor = C.accent + "88"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.opacity = done ? "0.85" : "1"; e.currentTarget.style.borderColor = done ? C.border : C.borderHi; }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 6 }}>
+        <Badge s={rc.status} />
       </div>
-      <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 12, padding: 32, width: "100%", maxWidth: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
-        <div style={{ fontSize: 13, color: C.muted, marginBottom: 24, lineHeight: 1.7, textAlign: "center" }}>Enter your phone number to sign in.</div>
-        {errMsg && <div role="alert" style={{ background: C.errorBg, border: `1px solid ${C.red}`, borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.errorText }}>{errMsg}</div>}
-        <Label>Phone Number</Label>
-        <input type="tel" aria-label="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="e.g. 087 123 4567" style={{ ...inp(C), width: "100%", marginBottom: 14, fontSize: 15 }} />
-        <button onClick={handleLogin} disabled={loading} style={{ width: "100%", background: loading ? (isDark(C) ? "#1a2a4a" : "#9ab0e8") : C.accent, border: "none", color: "#fff", padding: "13px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1 }}>
-          {loading ? "CHECKING…" : "SIGN IN"}
-        </button>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2, color: C.text }}>{rc.originHospital} <span style={{ color: C.muted, fontWeight: 400 }}>→</span> {rc.destinationHospital}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: C.muted }}>{Array.isArray(rc.itemsTransported) ? rc.itemsTransported.join(", ") : rc.itemsTransported || "—"}</div>
+        <div style={{ fontSize: 11, color: C.muted, textAlign: "right" }}>{Array.isArray(rc.riders) ? rc.riders.join(", ") : rc.riders || "—"}</div>
       </div>
-      <div style={{ marginTop: 20, fontSize: 11, color: C.muted, textAlign: "center" }}>Not registered? Contact your Blood Bike West administrator.</div>
-      {/iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone && (
-        <div style={{ marginTop: 20, background: C.hintBg, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: "14px 18px", maxWidth: 380, width: "100%", textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.7 }}>
-            📲 <strong style={{ color: C.text }}>Enable notifications on iPhone:</strong><br />
-            Tap <strong style={{ color: C.text }}>Share</strong> → <strong style={{ color: C.text }}>Add to Home Screen</strong><br />
-            Then open the app from your home screen.
-          </div>
-        </div>
-      )}
+      <div style={{ fontSize: 10, color: C.muted, marginTop: 4, fontFamily: "'IBM Plex Mono',monospace" }}>{fmtDT(done ? rc.completedAt : rc.timestamp)}</div>
     </div>
+  );
+}
+
+const groupLabel = (C, color, top) => ({ fontSize: 9, letterSpacing: 3, color, fontFamily: "'IBM Plex Mono',monospace", marginBottom: 10, ...(top ? { marginTop: 24 } : {}) });
+
+// Active run section. Completed runs are intentionally not shown in the app —
+// once completed they live only in the CompletedCalls sheet (the spreadsheet run log).
+export function RunGroups({ active, onOpen }) {
+  const C = useC();
+  if (active.length === 0) return null;
+  return (
+    <>
+      <div style={groupLabel(C, C.orange)}>ACTIVE — {active.length} RUN{active.length !== 1 ? "S" : ""}</div>
+      {active.map((rc) => <RunCard key={rc.id} rc={rc} onClickView={() => onOpen(rc.id)} />)}
+    </>
   );
 }

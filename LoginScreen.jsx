@@ -1,21 +1,20 @@
 import { useC, isDark } from "../lib/theme.jsx";
-import { Label, inp } from "../ui/primitives.jsx";
-import { nowTime } from "../lib/datetime.js";
 
-export default function AutoTime({ label, value, fieldKey, overrides, onOverride, note }) {
+// Absolute-positioned suggestion list shared by the location and item fields.
+export default function SuggestionDropdown({ items, onPick, header, right = 70 }) {
   const C = useC();
-  const ov = !!overrides[fieldKey];
+  if (!items.length) return null;
   return (
-    <div>
-      <Label auto note={note}>{label}</Label>
-      <div style={{ display: "flex", gap: 6 }}>
-        <input aria-label={label} type="time" value={value} readOnly={!ov} onChange={(e) => ov && onOverride(fieldKey, e.target.value)}
-          style={{ ...inp(C, ov, !ov), flex: 1, color: value ? C.text : C.muted }} />
-        <button onClick={() => onOverride(fieldKey, ov ? null : (value || nowTime()))}
-          style={{ background: ov ? (isDark(C) ? "#4d8aff22" : "#1a4fd618") : C.card, border: `1px solid ${ov ? C.accent : C.borderHi}`, color: ov ? C.accentText : C.muted, borderRadius: 6, padding: "0 10px", cursor: "pointer", fontSize: 10, whiteSpace: "nowrap" }}>
-          {ov ? "✎ on" : "✎"}
-        </button>
-      </div>
+    <div style={{ position: "absolute", top: "100%", left: 0, right, background: C.panel, border: `1px solid ${C.borderHi}`, borderRadius: 6, zIndex: 50, marginTop: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+      {header && <div style={{ padding: "6px 14px", fontSize: 10, color: C.muted, letterSpacing: 1 }}>{header}</div>}
+      {items.map((s) => (
+        <div key={s} onClick={() => onPick(s)}
+          style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, borderBottom: `1px solid ${C.border}`, color: C.text }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = isDark(C) ? "#2a2a40" : "#eeeef8")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+          {s}
+        </div>
+      ))}
     </div>
   );
 }
