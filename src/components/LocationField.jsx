@@ -46,15 +46,15 @@ export default function LocationField({ label, value, onChange, options, exclude
               <span style={{ fontSize: 13, color: C.text }}>Add <strong>"{confirmVal}"</strong> to the list?</span>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                 <button onClick={confirmAdd} style={{ background: C.green, color: isDark(C) ? "#000" : "#fff", border: "none", borderRadius: 5, padding: "5px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button>
-                <button onClick={() => setConfirmVal(null)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "5px 8px", fontSize: 11, cursor: "pointer" }}>✕</button>
+                <button aria-label="Cancel" onClick={() => setConfirmVal(null)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "5px 8px", fontSize: 11, cursor: "pointer" }}>✕</button>
               </div>
             </div>
           ) : (
             <div style={{ position: "relative" }}>
               <div style={{ display: "flex", gap: 6 }}>
-                <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAdd()} placeholder="Type location name…" autoFocus style={{ ...inp(C), flex: 1, width: "auto" }} />
+                <input aria-label={label} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAdd()} placeholder="Type location name…" autoFocus style={{ ...inp(C), flex: 1, width: "auto" }} />
                 <button onClick={handleAdd} style={{ background: C.accent, border: "none", color: "#fff", borderRadius: 6, padding: "0 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
-                <button onClick={() => { setAdding(false); setQuery(""); setSuggestions([]); }} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 10px", fontSize: 11, cursor: "pointer" }}>✕</button>
+                <button aria-label="Cancel adding location" onClick={() => { setAdding(false); setQuery(""); setSuggestions([]); }} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 10px", fontSize: 11, cursor: "pointer" }}>✕</button>
               </div>
               <SuggestionDropdown items={suggestions} onPick={pickSuggestion} header="SIMILAR EXISTING OPTIONS:" right={80} />
             </div>

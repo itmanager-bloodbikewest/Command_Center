@@ -33,14 +33,14 @@ export default function LoginScreen({ onLogin }) {
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div style={{ textAlign: "center", marginBottom: 40 }}>
         <img src="/logo.png" alt="Blood Bike West" style={{ width: 80, marginBottom: 8 }} />
-        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, fontFamily: "'IBM Plex Mono',monospace", color: C.text }}>BLOOD BIKE WEST</div>
+        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, fontFamily: "'IBM Plex Mono',monospace", color: C.text, margin: 0 }}>BLOOD BIKE WEST</h1>
         <div style={{ fontSize: 10, color: C.muted, letterSpacing: 4, marginTop: 2 }}>COMMAND CENTRE</div>
       </div>
       <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 12, padding: 32, width: "100%", maxWidth: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
         <div style={{ fontSize: 13, color: C.muted, marginBottom: 24, lineHeight: 1.7, textAlign: "center" }}>Enter your phone number to sign in.</div>
-        {errMsg && <div style={{ background: C.errorBg, border: `1px solid ${C.red}`, borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.errorText }}>{errMsg}</div>}
+        {errMsg && <div role="alert" style={{ background: C.errorBg, border: `1px solid ${C.red}`, borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.errorText }}>{errMsg}</div>}
         <Label>Phone Number</Label>
-        <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="e.g. 087 123 4567" style={{ ...inp(C), width: "100%", marginBottom: 14, fontSize: 15 }} />
+        <input type="tel" aria-label="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="e.g. 087 123 4567" style={{ ...inp(C), width: "100%", marginBottom: 14, fontSize: 15 }} />
         <button onClick={handleLogin} disabled={loading} style={{ width: "100%", background: loading ? (isDark(C) ? "#1a2a4a" : "#9ab0e8") : C.accent, border: "none", color: "#fff", padding: "13px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1 }}>
           {loading ? "CHECKING…" : "SIGN IN"}
         </button>

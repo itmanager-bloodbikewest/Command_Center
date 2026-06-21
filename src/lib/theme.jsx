@@ -13,7 +13,7 @@ export const THEME = {
     borderHi: "#2a2a42",
     text:     "#e2e2f0",
     muted:    "#9898b8",
-    accent:   "#4d8aff",
+    accent:   "#2f6bff",
     accentText:"#7aabff",
     green:    "#4ade80",
     orange:   "#fbbf24",
