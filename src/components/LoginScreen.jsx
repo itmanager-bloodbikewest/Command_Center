@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useC } from "../lib/theme.jsx";
 import { Label, inp } from "../ui/primitives.jsx";
 import { isDark } from "../lib/theme.jsx";
-import { api, registerPushNotifications } from "../lib/api.js";
+import { api } from "../lib/api.js";
 import { normalizePhone, saveSession } from "../lib/session.js";
 
 export default function LoginScreen({ onLogin }) {
@@ -21,7 +21,6 @@ export default function LoginScreen({ onLogin }) {
       const session = { phone: normalized, role: res.role, name: res.name, controllers: res.controllers || [], riders: res.riders || [], isController: !!res.isController, isRider: !!res.isRider, isAdmin: !!res.isAdmin };
       saveSession(session);
       onLogin(session);
-      registerPushNotifications(normalized).catch(() => {});
     } catch {
       setErrMsg("Could not connect to server. Please try again.");
     }
@@ -46,15 +45,6 @@ export default function LoginScreen({ onLogin }) {
         </button>
       </div>
       <div style={{ marginTop: 20, fontSize: 11, color: C.muted, textAlign: "center" }}>Not registered? Contact your Blood Bike West administrator.</div>
-      {/iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone && (
-        <div style={{ marginTop: 20, background: C.hintBg, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: "14px 18px", maxWidth: 380, width: "100%", textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.7 }}>
-            📲 <strong style={{ color: C.text }}>Enable notifications on iPhone:</strong><br />
-            Tap <strong style={{ color: C.text }}>Share</strong> → <strong style={{ color: C.text }}>Add to Home Screen</strong><br />
-            Then open the app from your home screen.
-          </div>
-        </div>
-      )}
     </div>
   );
 }

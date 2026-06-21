@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { ThemeProvider, useC } from "./lib/theme.jsx";
 import { loadSession, clearSession } from "./lib/session.js";
-import { registerPushNotifications } from "./lib/api.js";
 import LoginScreen from "./components/LoginScreen.jsx";
 import MainApp from "./MainApp.jsx";
 
@@ -39,7 +38,6 @@ function AppGate() {
       const saved = loadSession();
       if (saved && saved.role && saved.name) {
         setSession(saved);
-        if (saved.phone) registerPushNotifications(saved.phone).catch(() => {});
       } else {
         clearSession();
       }
