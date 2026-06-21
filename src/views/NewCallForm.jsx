@@ -8,7 +8,7 @@ import AutoTime from "../components/AutoTime.jsx";
 export default function NewCallForm({
   form, fset, ftog, handleOverride,
   lists, onAddLocation, onAddMeetup,
-  itemQuery, setItemQ, itemSugg, addItem, confirmItem, setCI, confirmAdd,
+  itemQuery, setItemQ, itemSugg, onAddItem,
   onSubmit, onCancel,
 }) {
   const C = useC();
@@ -25,17 +25,18 @@ export default function NewCallForm({
     setNewGroup("");
   };
 
+  const addItem = () => {
+    const v = itemQuery.trim();
+    if (!v) return;
+    const match = itemPicklist.find((i) => i.toLowerCase() === v.toLowerCase());
+    const val = match || v;
+    if (!match) onAddItem(v);
+    if (!form.itemsTransported.includes(val)) ftog("itemsTransported", val);
+    setItemQ("");
+  };
+
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 16, maxWidth: 920, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      {confirmItem && (
-        <div style={{ background: C.successBg, border: `1px solid ${C.green}`, borderRadius: 8, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: C.text }}>Add <strong>"{confirmItem}"</strong> to the picklist?</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={confirmAdd} style={{ background: C.green, color: isDark(C) ? "#000" : "#fff", border: "none", borderRadius: 5, padding: "6px 16px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM & ADD</button>
-            <button onClick={() => setCI(null)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button>
-          </div>
-        </div>
-      )}
       {confirmLeave && (
         <div style={{ background: C.confirmBg, border: `1px solid ${C.red}`, borderRadius: 8, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 13, color: C.text }}>Go back? Unsaved details will be lost.</span>

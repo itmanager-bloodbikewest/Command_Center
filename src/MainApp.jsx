@@ -47,7 +47,6 @@ export default function MainApp({ session, onLogout }) {
   const [dutyStatuses, setDutyStatuses] = useState([]);
   const [itemQuery, setItemQ] = useState("");
   const [itemSugg, setItemSugg] = useState([]);
-  const [confirmItem, setCI] = useState(null);
   const [detailId, setDetailId] = useState(null);
   const [toast, setToast] = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
@@ -88,7 +87,7 @@ export default function MainApp({ session, onLogout }) {
   const initiateNewCall = () => {
     const td = nowDate();
     setForm({ ...EMPTY_CALL, timestamp: nowDT(), riderCalled: nowTime(), transportDate: td, dateCallReceived: td, dateOfCallFromHospital: td, scheduledMeetupDate: td, controllerName: name, meetOtherGroup: [], overrides: {} });
-    setItemQ(""); setItemSugg([]); setCI(null);
+    setItemQ(""); setItemSugg([]);
     setView("newcall");
   };
 
@@ -106,22 +105,12 @@ export default function MainApp({ session, onLogout }) {
     if (!itemQuery.trim()) { setItemSugg([]); return; }
     const q = itemQuery.toLowerCase();
     setItemSugg(itemPicklist.filter((i) => i.toLowerCase().includes(q) && !form.itemsTransported.includes(i)));
-    setCI(null);
   }, [itemQuery, itemPicklist, form.itemsTransported]);
 
-  const addItem = () => {
-    const v = itemQuery.trim(); if (!v) return;
-    const match = itemPicklist.find((i) => i.toLowerCase() === v.toLowerCase());
-    if (match) { if (!form.itemsTransported.includes(match)) ftog("itemsTransported", match); setItemQ(""); }
-    else setCI(v);
-  };
-  const confirmAdd = () => {
-    const v = confirmItem;
-    setItems((p) => (p.includes(v) ? p : [...p, v]));
-    setForm((f) => ({ ...f, itemsTransported: [...f.itemsTransported, v] }));
-    setItemQ(""); setCI(null);
+  const onAddItem = (v) => {
+    setItems((p) => (p.includes(v) ? p : [...p, v].sort()));
     api("addToList", { sheet: "Items", value: v }).catch(() => {});
-    notify(`"${v}" added to picklist`);
+    notify(`"${v}" added`);
   };
 
   const onAddLocation = (v) => {
@@ -186,10 +175,10 @@ export default function MainApp({ session, onLogout }) {
 
   const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
 
-  // Rider list is filtered to runs assigned to this rider (or unassigned).
+  // Rider sees only runs where they were selected (active runs always have a rider).
   const isMyRun = (rc) => {
     const assigned = Array.isArray(rc.riders) ? rc.riders : typeof rc.riders === "string" ? [rc.riders] : [];
-    return assigned.length === 0 || assigned.some((r) => r.trim() === name.trim());
+    return assigned.some((r) => r.trim() === name.trim());
   };
 
   return (
@@ -255,15 +244,14 @@ export default function MainApp({ session, onLogout }) {
       )}
 
       {isControl && view === "log" && (
-        <RunLog pending={pendingDB} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
+        <RunLog pending={pendingDB.filter(loggedByMe)} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
       )}
 
       {isControl && view === "newcall" && (
         <NewCallForm
           form={form} fset={fset} ftog={ftog} handleOverride={handleOverride}
           lists={lists} onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
-          itemQuery={itemQuery} setItemQ={setItemQ} itemSugg={itemSugg} addItem={addItem}
-          confirmItem={confirmItem} setCI={setCI} confirmAdd={confirmAdd}
+          itemQuery={itemQuery} setItemQ={setItemQ} itemSugg={itemSugg} onAddItem={onAddItem}
           onSubmit={submitCall} onCancel={() => setView("log")}
         />
       )}
