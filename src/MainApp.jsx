@@ -116,10 +116,12 @@ export default function MainApp({ session, onLogout }) {
     else setCI(v);
   };
   const confirmAdd = () => {
-    setItems((p) => [...p, confirmItem]);
-    setForm((f) => ({ ...f, itemsTransported: [...f.itemsTransported, confirmItem] }));
+    const v = confirmItem;
+    setItems((p) => (p.includes(v) ? p : [...p, v]));
+    setForm((f) => ({ ...f, itemsTransported: [...f.itemsTransported, v] }));
     setItemQ(""); setCI(null);
-    notify(`"${confirmItem}" added to picklist`);
+    api("addToList", { sheet: "Items", value: v }).catch(() => {});
+    notify(`"${v}" added to picklist`);
   };
 
   const onAddLocation = (v) => {

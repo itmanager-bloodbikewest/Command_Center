@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Label, Section, Badge, inp } from "../ui/primitives.jsx";
 import { fmtTime, fmtDate } from "../lib/datetime.js";
-import { isMobileUA, smsLink, whatsappLink } from "../lib/messaging.js";
+import { isMobileUA, smsLink } from "../lib/messaging.js";
 import NotesList from "./NotesList.jsx";
 
 const InfoRow = ({ label, value, C }) => value ? (
@@ -37,20 +37,13 @@ function ChannelChooser({ C, label, controllerName, onPick, onCancel }) {
           Send “{label}” to {controllerName || "controller"}
         </div>
         <div style={{ textAlign: "center", marginBottom: 18, fontSize: 12, color: C.muted }}>
-          Choose how to message the controller
+          This opens your Messages app with the update ready to send.
         </div>
         <button onClick={() => onPick("sms")} style={sheetBtn(C)}>
           <span style={{ fontSize: 20 }}>💬</span>
           <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.3 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Text message</span>
             <span style={{ fontSize: 11, color: C.muted }}>Opens your Messages app</span>
-          </span>
-        </button>
-        <button onClick={() => onPick("whatsapp")} style={sheetBtn(C)}>
-          <span style={{ fontSize: 20 }}>🟢</span>
-          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.3 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>WhatsApp</span>
-            <span style={{ fontSize: 11, color: C.muted }}>Opens WhatsApp chat</span>
           </span>
         </button>
         <button onClick={onCancel}
@@ -84,9 +77,7 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
     if (!chooser) return;
     const { label, handler } = chooser;
     handler(); // status write — this is the commit point
-    const link = channel === "sms"
-      ? smsLink(c.controllerPhone, label)
-      : whatsappLink(c.controllerPhone, label);
+    const link = smsLink(c.controllerPhone, label);
     if (link) window.location.href = link;
     setChooser(null);
   };
