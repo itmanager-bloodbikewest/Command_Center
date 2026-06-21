@@ -173,6 +173,11 @@ export default function MainApp({ session, onLogout }) {
   // A run is editable in the admin view only if this admin logged it.
   const loggedByMe = (rc) => !!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone);
 
+  // Controller sees a run if they are the controller named on it (or logged it).
+  const myControlRun = (rc) =>
+    (!!rc.controllerName && rc.controllerName.trim() === name.trim()) ||
+    (!!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone));
+
   const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
 
   // Rider sees only runs where they were selected (active runs always have a rider).
@@ -244,7 +249,7 @@ export default function MainApp({ session, onLogout }) {
       )}
 
       {isControl && view === "log" && (
-        <RunLog pending={pendingDB.filter(loggedByMe)} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
+        <RunLog pending={pendingDB.filter(myControlRun)} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
       )}
 
       {isControl && view === "newcall" && (

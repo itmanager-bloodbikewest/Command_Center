@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Section, Grid, Label, Chip, inp, sel } from "../ui/primitives.jsx";
 import LocationField from "../components/LocationField.jsx";
@@ -15,6 +15,12 @@ export default function NewCallForm({
   const { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses } = lists;
   const [newGroup, setNewGroup] = useState("");
   const [confirmLeave, setConfirmLeave] = useState(false);
+
+  const reqBg  = isDark(C) ? "#3a3320" : "#fffbe0"; // required, not prefilled -> light yellow
+  const autoBg = isDark(C) ? "#1c2738" : "#e9f2ff"; // auto-captured -> light blue
+  const notesRef = useRef(null);
+  const isOtherNotes = (item) => { const l = String(item).toLowerCase(); return l.includes("other") && l.includes("note"); };
+  const focusNotes = () => setTimeout(() => { notesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); notesRef.current?.focus(); }, 60);
 
   const addGroup = () => {
     const v = newGroup.trim();
@@ -49,35 +55,24 @@ export default function NewCallForm({
       <button onClick={() => setConfirmLeave(true)} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 10 }}>← BACK</button>
       <div style={{ fontSize: 10, color: C.muted, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, marginBottom: 18 }}>NEW CALL — * REQUIRED FIELDS</div>
 
-      <Section title="Call Metadata">
+      <Section title="Call Date and Time">
         <Grid cols={2}>
-          <div><Label auto>Timestamp</Label><input aria-label="Timestamp (auto)" value={form.timestamp} readOnly style={{ ...inp(C, false, true), width: "100%" }} /></div>
-          <div><Label>Time of Call from Hospital *</Label><input type="time" aria-label="Time of Call from Hospital" value={form.timeOfCall} onChange={(e) => fset("timeOfCall", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label>Date of Call from Hospital</Label><input type="date" aria-label="Date of Call from Hospital" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label>Controller Name *</Label>
-            <select aria-label="Controller Name" value={form.controllerName} onChange={(e) => fset("controllerName", e.target.value)} style={{ ...sel(C), width: "100%" }}>
-              <option value="">— Select —</option>
-              {controllers.map((ctrl, i) => <option key={i}>{String(ctrl.name || ctrl)}</option>)}
-            </select>
-          </div>
-          <div><Label>Transport Date *</Label><input type="date" aria-label="Transport Date" value={form.transportDate} onChange={(e) => fset("transportDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-          <div>
-            <Label auto>Date Call Received</Label>
-            <input type="date" aria-label="Date Call Received" value={form.dateCallReceived} onChange={(e) => fset("dateCallReceived", e.target.value)} style={{ ...inp(C), width: "100%" }} />
-          </div>
+          <div><Label>Time of Call from Hospital *</Label><input type="time" aria-label="Time of Call from Hospital" value={form.timeOfCall} onChange={(e) => fset("timeOfCall", e.target.value)} style={{ ...inp(C), width: "100%", background: reqBg }} /></div>
+          <div><Label auto>Date of Call from Hospital</Label><input type="date" aria-label="Date of Call from Hospital (auto)" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%", background: autoBg }} /></div>
+          <div><Label>Transport Date *</Label><input type="date" aria-label="Transport Date" value={form.transportDate} onChange={(e) => fset("transportDate", e.target.value)} style={{ ...inp(C), width: "100%", background: reqBg }} /></div>
         </Grid>
       </Section>
 
       <Section title="Route">
         <Grid cols={1}>
-          <LocationField label="Origin *" value={form.originHospital} onChange={(v) => fset("originHospital", v)} options={hospitals} exclude={[form.destinationHospital]} onAdd={onAddLocation} />
-          <LocationField label="Destination *" value={form.destinationHospital} onChange={(v) => fset("destinationHospital", v)} options={hospitals} exclude={[form.originHospital]} onAdd={onAddLocation} />
+          <LocationField label="Origin *" value={form.originHospital} onChange={(v) => fset("originHospital", v)} options={hospitals} exclude={[form.destinationHospital]} onAdd={onAddLocation} bg={reqBg} />
+          <LocationField label="Destination *" value={form.destinationHospital} onChange={(v) => fset("destinationHospital", v)} options={hospitals} exclude={[form.originHospital]} onAdd={onAddLocation} bg={reqBg} />
         </Grid>
       </Section>
 
       <Section title="Items Transported">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
-          {itemPicklist.map((item) => <Chip key={item} active={form.itemsTransported.includes(item)} onClick={() => ftog("itemsTransported", item)}>{form.itemsTransported.includes(item) ? "✓ " : ""}{item}</Chip>)}
+          {itemPicklist.map((item) => <Chip key={item} active={form.itemsTransported.includes(item)} onClick={() => { const wasActive = form.itemsTransported.includes(item); ftog("itemsTransported", item); if (!wasActive && isOtherNotes(item)) focusNotes(); }}>{form.itemsTransported.includes(item) ? "✓ " : ""}{item}</Chip>)}
         </div>
         <div style={{ position: "relative" }}>
           <Label optional note="type to search or add new">Custom Item</Label>
@@ -88,13 +83,13 @@ export default function NewCallForm({
           <SuggestionDropdown items={itemSugg} onPick={(s) => { ftog("itemsTransported", s); setItemQ(""); }} right={70} />
         </div>
         {form.itemsTransported.length > 0 && <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>{form.itemsTransported.map((i) => <span key={i} style={{ background: C.accent + "22", color: C.accentText, border: `1px solid ${C.accent}44`, borderRadius: 12, padding: "3px 10px", fontSize: 11 }}>{i} <span onClick={() => ftog("itemsTransported", i)} style={{ cursor: "pointer", marginLeft: 4, color: C.red }}>×</span></span>)}</div>}
-        <div style={{ marginTop: 14 }}><Label>Number of Packages *</Label><input type="number" min="1" aria-label="Number of Packages" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120 }} /></div>
+        <div style={{ marginTop: 14 }}><Label>Number of Packages *</Label><input type="number" min="1" aria-label="Number of Packages" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120, background: reqBg }} /></div>
       </Section>
 
       <Section title="Crew & Vehicle">
         <Grid cols={1} gap={12}>
           <div><Label>Rider *</Label>
-            <select aria-label="Rider" value={form.riders[0] || ""} onChange={(e) => fset("riders", e.target.value ? [e.target.value] : [])} style={{ ...sel(C), width: "100%" }}>
+            <select aria-label="Rider" value={form.riders[0] || ""} onChange={(e) => fset("riders", e.target.value ? [e.target.value] : [])} style={{ ...sel(C), width: "100%", background: reqBg }}>
               <option value="">— Select Rider —</option>
               {riders.map((r, i) => <option key={i}>{String(r.name || r)}</option>)}
             </select>
@@ -140,7 +135,7 @@ export default function NewCallForm({
         </Grid>
       </Section>
 
-      <Section title="Timing — Auto-Captured (Override Available)">
+      <Section title="AUTOMATED TIMESTAMPS - EDIT ONLY IF REQUIRED">
         <Grid cols={2}>
           <AutoTime label="Rider Called" value={form.riderCalled} fieldKey="riderCalled" overrides={form.overrides} onOverride={handleOverride} note="auto on New Call" />
           <AutoTime label="Pickup Time" value={form.pickupTime} fieldKey="pickupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Picked Up" />
@@ -151,7 +146,7 @@ export default function NewCallForm({
       </Section>
 
       <Section title="Other Details / Notes">
-        <textarea aria-label="Notes" value={form.notes} onChange={(e) => fset("notes", e.target.value)} rows={3} placeholder="Additional details, special instructions, observations…" style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
+        <textarea ref={notesRef} aria-label="Notes" value={form.notes} onChange={(e) => fset("notes", e.target.value)} rows={3} placeholder="Additional details, special instructions, observations…" style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
       </Section>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>

@@ -3,7 +3,7 @@ import { useC, isDark, THEME } from "../lib/theme.jsx";
 import { Label, inp, sel } from "../ui/primitives.jsx";
 import SuggestionDropdown from "./SuggestionDropdown.jsx";
 
-export default function LocationField({ label, value, onChange, options, exclude = [], onAdd }) {
+export default function LocationField({ label, value, onChange, options, exclude = [], onAdd, bg }) {
   const C = useC();
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
@@ -33,7 +33,7 @@ export default function LocationField({ label, value, onChange, options, exclude
       <Label>{label}</Label>
       {!adding ? (
         <div style={{ display: "flex", gap: 6 }}>
-          <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto" }}>
+          <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto", background: bg || C.inputBg }}>
             <option value="">— Select —</option>
             {options.filter((o) => !exclude.includes(o)).map((h) => <option key={h}>{h}</option>)}
           </select>
