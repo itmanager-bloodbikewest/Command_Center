@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Section, Grid, Label, Chip, inp, sel } from "../ui/primitives.jsx";
 import LocationField from "../components/LocationField.jsx";
@@ -8,7 +8,7 @@ import AutoTime from "../components/AutoTime.jsx";
 export default function NewCallForm({
   form, fset, ftog, handleOverride,
   lists, onAddLocation, onAddMeetup,
-  itemQuery, setItemQ, itemSugg, onAddItem,
+  itemQuery, setItemQ, itemSugg,
   onSubmit, onCancel,
 }) {
   const C = useC();
@@ -18,9 +18,27 @@ export default function NewCallForm({
 
   const reqBg  = isDark(C) ? "#3a3320" : "#fffbe0"; // required, not prefilled -> light yellow
   const autoBg = isDark(C) ? "#1c2738" : "#e9f2ff"; // auto-captured -> light blue
-  const notesRef = useRef(null);
   const isOtherNotes = (item) => { const l = String(item).toLowerCase(); return l.includes("other") && l.includes("note"); };
-  const focusNotes = () => setTimeout(() => { notesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); notesRef.current?.focus(); }, 60);
+
+  // "Other (Add to Notes)" notes popup (replaces former scroll-to-focus behaviour)
+  const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [otherNoteSaved, setOtherNoteSaved] = useState(false);
+  const openOtherNotes = () => { setNotesDraft(otherNoteSaved ? (form.notes || "") : ""); setNotesModalOpen(true); };
+  const saveOtherNotes = () => {
+    if (!otherNoteSaved) {
+      const t = notesDraft.trim();
+      if (t) {
+        const newNotes = (form.notes ? form.notes + "\n" : "") + "Other item: " + t;
+        fset("notes", newNotes);
+        setOtherNoteSaved(true);
+      }
+    } else {
+      fset("notes", notesDraft);
+    }
+    setNotesModalOpen(false);
+  };
+  const cancelOtherNotes = () => setNotesModalOpen(false); // leaves "Other" selected, no change
 
   const addGroup = () => {
     const v = newGroup.trim();
@@ -34,15 +52,26 @@ export default function NewCallForm({
   const addItem = () => {
     const v = itemQuery.trim();
     if (!v) return;
+    // Search-only: select an exact existing match; do nothing if no match (no create).
     const match = itemPicklist.find((i) => i.toLowerCase() === v.toLowerCase());
-    const val = match || v;
-    if (!match) onAddItem(v);
-    if (!form.itemsTransported.includes(val)) ftog("itemsTransported", val);
+    if (match && !form.itemsTransported.includes(match)) ftog("itemsTransported", match);
     setItemQ("");
   };
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: 16, maxWidth: 920, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      {notesModalOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+          <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: 20, width: "100%", maxWidth: 520, boxSizing: "border-box" }}>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: C.muted, fontFamily: "'IBM Plex Mono',monospace", marginBottom: 12 }}>{otherNoteSaved ? "EDIT NOTES" : "OTHER ITEM — ADD TO NOTES"}</div>
+            <textarea aria-label="Other item notes" value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={otherNoteSaved ? 8 : 4} autoFocus placeholder={otherNoteSaved ? "Edit notes…" : "Describe the other item…"} style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
+            <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
+              <button onClick={cancelOtherNotes} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "8px 16px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button>
+              <button onClick={saveOtherNotes} style={{ background: C.accent, border: "none", color: "#fff", borderRadius: 6, padding: "8px 18px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>SAVE AND CLOSE</button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmLeave && (
         <div style={{ background: C.confirmBg, border: `1px solid ${C.red}`, borderRadius: 8, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 13, color: C.text }}>Go back? Unsaved details will be lost.</span>
@@ -72,10 +101,10 @@ export default function NewCallForm({
 
       <Section title="Items Transported">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
-          {itemPicklist.map((item) => <Chip key={item} active={form.itemsTransported.includes(item)} onClick={() => { const wasActive = form.itemsTransported.includes(item); ftog("itemsTransported", item); if (!wasActive && isOtherNotes(item)) focusNotes(); }}>{form.itemsTransported.includes(item) ? "✓ " : ""}{item}</Chip>)}
+          {itemPicklist.map((item) => <Chip key={item} active={form.itemsTransported.includes(item)} onClick={() => { const wasActive = form.itemsTransported.includes(item); ftog("itemsTransported", item); if (!wasActive && isOtherNotes(item)) openOtherNotes(); }}>{form.itemsTransported.includes(item) ? "✓ " : ""}{item}</Chip>)}
         </div>
         <div style={{ position: "relative" }}>
-          <Label optional note="type to search or add new">Custom Item</Label>
+          <Label optional note="type to search">Custom Item</Label>
           <div style={{ display: "flex", gap: 6 }}>
             <input aria-label="Item name" value={itemQuery} onChange={(e) => setItemQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} placeholder="Type item name…" style={{ ...inp(C), flex: 1, width: "auto" }} />
             <button onClick={addItem} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
@@ -146,7 +175,7 @@ export default function NewCallForm({
       </Section>
 
       <Section title="Other Details / Notes">
-        <textarea ref={notesRef} aria-label="Notes" value={form.notes} onChange={(e) => fset("notes", e.target.value)} rows={3} placeholder="Additional details, special instructions, observations…" style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
+        <textarea aria-label="Notes" value={form.notes} onChange={(e) => fset("notes", e.target.value)} rows={3} placeholder="Additional details, special instructions, observations…" style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
       </Section>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>

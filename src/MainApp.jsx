@@ -107,12 +107,6 @@ export default function MainApp({ session, onLogout }) {
     setItemSugg(itemPicklist.filter((i) => i.toLowerCase().includes(q) && !form.itemsTransported.includes(i)));
   }, [itemQuery, itemPicklist, form.itemsTransported]);
 
-  const onAddItem = (v) => {
-    setItems((p) => (p.includes(v) ? p : [...p, v].sort()));
-    api("addToList", { sheet: "Items", value: v }).catch(() => {});
-    notify(`"${v}" added`);
-  };
-
   const onAddLocation = (v) => {
     setHospitals((p) => [...p, v].sort());
     api("addToList", { sheet: "OriginDestination", value: v }).catch(() => {});
@@ -256,7 +250,7 @@ export default function MainApp({ session, onLogout }) {
         <NewCallForm
           form={form} fset={fset} ftog={ftog} handleOverride={handleOverride}
           lists={lists} onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
-          itemQuery={itemQuery} setItemQ={setItemQ} itemSugg={itemSugg} onAddItem={onAddItem}
+          itemQuery={itemQuery} setItemQ={setItemQ} itemSugg={itemSugg}
           onSubmit={submitCall} onCancel={() => setView("log")}
         />
       )}

@@ -74,6 +74,21 @@ function TimingRow({ label, fieldKey, note, sc, allCalls, patchField, notify, is
   );
 }
 
+// Card that collapses to title + VIEW OR EDIT; expands in place. Independent per card.
+function CollapsibleSection({ title, children }) {
+  const C = useC();
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ background: C.sectionBg, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: open ? 14 : 0 }}>
+        <div style={{ fontSize: 10, letterSpacing: 3, color: C.muted, fontFamily: "'IBM Plex Mono',monospace" }}>{title}</div>
+        <button onClick={() => setOpen((o) => !o)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "4px 12px", cursor: "pointer", fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>{open ? "HIDE" : "VIEW OR EDIT"}</button>
+      </div>
+      {open && children}
+    </div>
+  );
+}
+
 export default function CallDetail({ sc, allCalls, patchField, notify, vehicles = [], confirmComplete, setConfirmComplete, markComplete, onTryComplete, onBack, readOnly = false }) {
   const C = useC();
   const isCompleted = sc.status === "complete";
@@ -95,38 +110,6 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
           : <div style={{ background: C.confirmBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: "14px 18px", textAlign: "center", minWidth: 200 }}><div style={{ fontSize: 12, color: C.text, marginBottom: 10, fontFamily: "'IBM Plex Mono',monospace" }}>Move to Completed Calls?</div><div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>This will archive the record.</div><div style={{ display: "flex", gap: 8 }}><button onClick={() => markComplete(sc.id)} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button><button onClick={() => setConfirmComplete(false)} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button></div></div>
         )}
       </div>
-      <Section title="Call Metadata">
-        <EditRow {...rowCtx} label="Timestamp" readOnly><span>{fmtDT(sc.timestamp)}</span></EditRow>
-        <EditRow {...rowCtx} label="Time of Call" fieldKey="timeOfCall" type="time" fmt={fmtTime} />
-        <EditRow {...rowCtx} label="Date of Call" fieldKey="dateOfCallFromHospital" type="date" fmt={fmtDate} />
-        <EditRow {...rowCtx} label="Controller" fieldKey="controllerName" />
-        <EditRow {...rowCtx} label="Transport Date" fieldKey="transportDate" type="date" fmt={fmtDate} />
-        <EditRow {...rowCtx} label="Date Call Received" fieldKey="dateCallReceived" type="date" fmt={fmtDate} />
-        <EditRow {...rowCtx} label="Rider Called" readOnly><span style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{fmtTime(sc.riderCalled)}</span></EditRow>
-      </Section>
-      <Section title="Route">
-        <EditRow {...rowCtx} label="Origin" readOnly><span>{sc.originHospital}</span></EditRow>
-        <EditRow {...rowCtx} label="Destination" readOnly><span>{sc.destinationHospital}</span></EditRow>
-        <EditRow {...rowCtx} label="Items" readOnly><span>{Array.isArray(sc.itemsTransported) ? sc.itemsTransported.join(", ") : sc.itemsTransported || "—"}</span></EditRow>
-        <EditRow {...rowCtx} label="No. of Packages" fieldKey="numPackages" type="number" />
-      </Section>
-      {(sc.contactName || sc.contactPhone || sc.pickupAddress || sc.dropOffAddress) && (
-        <Section title="Contact">
-          {sc.contactName && <EditRow {...rowCtx} label="Contact Name" fieldKey="contactName" />}
-          {sc.contactPhone && <EditRow {...rowCtx} label="Contact Phone" fieldKey="contactPhone" type="tel" />}
-          {sc.pickupAddress && <EditRow {...rowCtx} label="Pick-up Address" fieldKey="pickupAddress" />}
-          {sc.dropOffAddress && <EditRow {...rowCtx} label="Drop-off Address" fieldKey="dropOffAddress" />}
-        </Section>
-      )}
-      <Section title="Crew & Vehicle">
-        <EditRow {...rowCtx} label="Rider(s)" readOnly><span>{Array.isArray(sc.riders) ? sc.riders.join(", ") : sc.riders || "—"}</span></EditRow>
-        <EditRow {...rowCtx} label="Duty Status" readOnly><span>{sc.riderDutyStatus || "—"}</span></EditRow>
-        <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicles} />
-        <EditRow {...rowCtx} label="Meet Other Group" readOnly><span>{Array.isArray(sc.meetOtherGroup) ? sc.meetOtherGroup.join(", ") || "—" : sc.meetOtherGroup || "—"}</span></EditRow>
-        <EditRow {...rowCtx} label="Meet-up Date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate} />
-        <EditRow {...rowCtx} label="Meet-up Time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
-        <EditRow {...rowCtx} label="Green Lights" readOnly><span style={{ color: sc.greenLights === true ? C.green : sc.greenLights === false ? C.red : C.muted }}>{sc.greenLights === true ? "✓ YES" : sc.greenLights === false ? "✕ NO" : "—"}</span></EditRow>
-      </Section>
       <Section title="Timing Log">
         <TimingRow {...timeCtx} label="Rider Called" fieldKey="riderCalled" />
         <TimingRow {...timeCtx} label="Pickup Time" fieldKey="pickupTime" note="triggers on rider Picked Up" />
@@ -136,10 +119,42 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         <TimingRow {...timeCtx} label="Rider Home" fieldKey="riderHome" note="triggers on rider Rider Home" />
         {isCompleted && <TimingRow {...timeCtx} label="Completed At" fieldKey="completedAt" />}
       </Section>
-      <Section title="Notes">
+      <CollapsibleSection title="Call Date and Time">
+        <EditRow {...rowCtx} label="Timestamp" readOnly><span>{fmtDT(sc.timestamp)}</span></EditRow>
+        <EditRow {...rowCtx} label="Time of Call" fieldKey="timeOfCall" type="time" fmt={fmtTime} />
+        <EditRow {...rowCtx} label="Date of Call" fieldKey="dateOfCallFromHospital" type="date" fmt={fmtDate} />
+        <EditRow {...rowCtx} label="Controller" fieldKey="controllerName" />
+        <EditRow {...rowCtx} label="Transport Date" fieldKey="transportDate" type="date" fmt={fmtDate} />
+        <EditRow {...rowCtx} label="Date Call Received" fieldKey="dateCallReceived" type="date" fmt={fmtDate} />
+        <EditRow {...rowCtx} label="Rider Called" readOnly><span style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{fmtTime(sc.riderCalled)}</span></EditRow>
+      </CollapsibleSection>
+      <CollapsibleSection title="Route">
+        <EditRow {...rowCtx} label="Origin" readOnly><span>{sc.originHospital}</span></EditRow>
+        <EditRow {...rowCtx} label="Destination" readOnly><span>{sc.destinationHospital}</span></EditRow>
+        <EditRow {...rowCtx} label="Items" readOnly><span>{Array.isArray(sc.itemsTransported) ? sc.itemsTransported.join(", ") : sc.itemsTransported || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="No. of Packages" fieldKey="numPackages" type="number" />
+      </CollapsibleSection>
+      {(sc.contactName || sc.contactPhone || sc.pickupAddress || sc.dropOffAddress) && (
+        <CollapsibleSection title="Contact">
+          {sc.contactName && <EditRow {...rowCtx} label="Contact Name" fieldKey="contactName" />}
+          {sc.contactPhone && <EditRow {...rowCtx} label="Contact Phone" fieldKey="contactPhone" type="tel" />}
+          {sc.pickupAddress && <EditRow {...rowCtx} label="Pick-up Address" fieldKey="pickupAddress" />}
+          {sc.dropOffAddress && <EditRow {...rowCtx} label="Drop-off Address" fieldKey="dropOffAddress" />}
+        </CollapsibleSection>
+      )}
+      <CollapsibleSection title="Crew & Vehicle">
+        <EditRow {...rowCtx} label="Rider(s)" readOnly><span>{Array.isArray(sc.riders) ? sc.riders.join(", ") : sc.riders || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="Duty Status" readOnly><span>{sc.riderDutyStatus || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicles} />
+        <EditRow {...rowCtx} label="Meet Other Group" readOnly><span>{Array.isArray(sc.meetOtherGroup) ? sc.meetOtherGroup.join(", ") || "—" : sc.meetOtherGroup || "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="Meet-up Date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate} />
+        <EditRow {...rowCtx} label="Meet-up Time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
+        <EditRow {...rowCtx} label="Green Lights" readOnly><span style={{ color: sc.greenLights === true ? C.green : sc.greenLights === false ? C.red : C.muted }}>{sc.greenLights === true ? "✓ YES" : sc.greenLights === false ? "✕ NO" : "—"}</span></EditRow>
+      </CollapsibleSection>
+      <CollapsibleSection title="Notes">
         <NotesList notes={sc.notes} />
         {!locked && <ControllerNoteBox sc={sc} patchField={patchField} notify={notify} />}
-      </Section>
+      </CollapsibleSection>
     </div>
   );
 }
