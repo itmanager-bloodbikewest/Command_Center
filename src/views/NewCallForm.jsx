@@ -2,13 +2,11 @@ import { useState } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Section, Grid, Label, Chip, inp, sel } from "../ui/primitives.jsx";
 import LocationField from "../components/LocationField.jsx";
-import SuggestionDropdown from "../components/SuggestionDropdown.jsx";
 import AutoTime from "../components/AutoTime.jsx";
 
 export default function NewCallForm({
   form, fset, ftog, handleOverride,
   lists, onAddLocation, onAddMeetup,
-  itemQuery, setItemQ, itemSugg,
   onSubmit, onCancel,
 }) {
   const C = useC();
@@ -47,15 +45,6 @@ export default function NewCallForm({
     const cur = Array.isArray(form.meetOtherGroup) ? form.meetOtherGroup : [];
     if (!cur.includes(v)) fset("meetOtherGroup", [...cur, v]);
     setNewGroup("");
-  };
-
-  const addItem = () => {
-    const v = itemQuery.trim();
-    if (!v) return;
-    // Search-only: select an exact existing match; do nothing if no match (no create).
-    const match = itemPicklist.find((i) => i.toLowerCase() === v.toLowerCase());
-    if (match && !form.itemsTransported.includes(match)) ftog("itemsTransported", match);
-    setItemQ("");
   };
 
   return (
@@ -102,14 +91,6 @@ export default function NewCallForm({
       <Section title="Items Transported">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
           {itemPicklist.map((item) => <Chip key={item} active={form.itemsTransported.includes(item)} onClick={() => { const wasActive = form.itemsTransported.includes(item); ftog("itemsTransported", item); if (!wasActive && isOtherNotes(item)) openOtherNotes(); }}>{form.itemsTransported.includes(item) ? "✓ " : ""}{item}</Chip>)}
-        </div>
-        <div style={{ position: "relative" }}>
-          <Label optional note="type to search">Custom Item</Label>
-          <div style={{ display: "flex", gap: 6 }}>
-            <input aria-label="Item name" value={itemQuery} onChange={(e) => setItemQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addItem()} placeholder="Type item name…" style={{ ...inp(C), flex: 1, width: "auto" }} />
-            <button onClick={addItem} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
-          </div>
-          <SuggestionDropdown items={itemSugg} onPick={(s) => { ftog("itemsTransported", s); setItemQ(""); }} right={70} />
         </div>
         {form.itemsTransported.length > 0 && <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>{form.itemsTransported.map((i) => <span key={i} style={{ background: C.accent + "22", color: C.accentText, border: `1px solid ${C.accent}44`, borderRadius: 12, padding: "3px 10px", fontSize: 11 }}>{i} <span onClick={() => ftog("itemsTransported", i)} style={{ cursor: "pointer", marginLeft: 4, color: C.red }}>×</span></span>)}</div>}
         <div style={{ marginTop: 14 }}><Label>Number of Packages *</Label><input type="number" min="1" aria-label="Number of Packages" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120, background: reqBg }} /></div>

@@ -44,9 +44,8 @@ export default function MainApp({ session, onLogout }) {
   const [vehicles, setVehicles] = useState([]);
   const [meetups, setMeetups] = useState([]);
   const [itemPicklist, setItems] = useState([]);
+
   const [dutyStatuses, setDutyStatuses] = useState([]);
-  const [itemQuery, setItemQ] = useState("");
-  const [itemSugg, setItemSugg] = useState([]);
   const [detailId, setDetailId] = useState(null);
   const [toast, setToast] = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
@@ -87,7 +86,6 @@ export default function MainApp({ session, onLogout }) {
   const initiateNewCall = () => {
     const td = nowDate();
     setForm({ ...EMPTY_CALL, timestamp: nowDT(), riderCalled: nowTime(), transportDate: td, dateCallReceived: td, dateOfCallFromHospital: td, scheduledMeetupDate: td, controllerName: name, meetOtherGroup: [], overrides: {} });
-    setItemQ(""); setItemSugg([]);
     setView("newcall");
   };
 
@@ -101,11 +99,6 @@ export default function MainApp({ session, onLogout }) {
     });
   };
   useEffect(() => { if (!form.overrides?.dateCallReceived) setForm((f) => ({ ...f, dateCallReceived: f.transportDate })); }, [form.transportDate]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!itemQuery.trim()) { setItemSugg([]); return; }
-    const q = itemQuery.toLowerCase();
-    setItemSugg(itemPicklist.filter((i) => i.toLowerCase().includes(q) && !form.itemsTransported.includes(i)));
-  }, [itemQuery, itemPicklist, form.itemsTransported]);
 
   const onAddLocation = (v) => {
     setHospitals((p) => [...p, v].sort());
@@ -250,7 +243,6 @@ export default function MainApp({ session, onLogout }) {
         <NewCallForm
           form={form} fset={fset} ftog={ftog} handleOverride={handleOverride}
           lists={lists} onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
-          itemQuery={itemQuery} setItemQ={setItemQ} itemSugg={itemSugg}
           onSubmit={submitCall} onCancel={() => setView("log")}
         />
       )}
