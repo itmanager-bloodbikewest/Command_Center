@@ -180,7 +180,7 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         </CollapsibleSection>
       )}
       <CollapsibleSection title="Crew & vehicle" locked={locked}>
-        <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" multi options={riderNames} />
+        <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" options={riderNames} fmt={(v) => Array.isArray(v) ? v.join(", ") : v || "—"} arrayWrap />
         <EditRow {...rowCtx} label="Duty status" fieldKey="riderDutyStatus" options={dutyStatuses} />
         <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicleList} />
         <EditRow {...rowCtx} label="Meet other group" fieldKey="meetOtherGroup" multi options={meetups} />
