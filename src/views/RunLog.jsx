@@ -1,7 +1,7 @@
 import { useC } from "../lib/theme.jsx";
 import { RunGroups } from "../components/RunCard.jsx";
 
-export default function RunLog({ pending, onOpen, onNewCall }) {
+export default function RunLog({ pending, onOpen, onNewCall, onComplete, vehicles }) {
   const C = useC();
   const empty = pending.length === 0;
   return (
@@ -12,7 +12,7 @@ export default function RunLog({ pending, onOpen, onNewCall }) {
           <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, letterSpacing: 2, color: C.muted }}>NO RUNS LOGGED TODAY</div>
           {onNewCall && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Press <button onClick={onNewCall} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: C.accentText, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>+ NEW CALL</button> to begin</div>}
         </div>
-      ) : <RunGroups active={pending} onOpen={onOpen} />}
+      ) : <RunGroups active={pending} onOpen={onOpen} onComplete={onComplete} vehicles={vehicles} />}
     </div>
   );
 }

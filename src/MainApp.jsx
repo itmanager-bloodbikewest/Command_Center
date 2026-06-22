@@ -153,6 +153,20 @@ export default function MainApp({ session, onLogout }) {
     catch { notify("Complete saved locally — sync error", C.orange); }
   };
 
+  // Complete a run directly from the controller log, optionally setting the vehicle on the spot.
+  const completeFromLog = async (id, vehicleChoice) => {
+    const call = pendingDB.find((x) => x.id === id); if (!call) return;
+    const merged = { ...call, ...(vehicleChoice ? { vehicleUsed: vehicleChoice } : {}) };
+    const missing = completeMissing(merged);
+    if (missing.length) { notify(missingMsg("Can't complete — missing required:", missing), C.red); return; }
+    if (vehicleChoice && vehicleChoice !== call.vehicleUsed) { await patchCall(id, { vehicleUsed: vehicleChoice }); }
+    const completedAt = nowDT();
+    setPendingDB((prev) => prev.filter((x) => x.id !== id));
+    notify("Run completed", C.purple);
+    try { await api("completeCall", { id, completedAt }); }
+    catch { notify("Complete saved locally — sync error", C.orange); }
+  };
+
   const isControl = dash === "control";
   const isAdminView = dash === "admin";
   const hasHeaderActions = isControl || dashboards.length > 1; // is there a row-2 on mobile
@@ -236,7 +250,7 @@ export default function MainApp({ session, onLogout }) {
       )}
 
       {isControl && view === "log" && (
-        <RunLog pending={pendingDB.filter(myControlRun)} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} />
+        <RunLog pending={pendingDB.filter(myControlRun)} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} onComplete={completeFromLog} vehicles={vehicles} />
       )}
 
       {isControl && view === "newcall" && (
