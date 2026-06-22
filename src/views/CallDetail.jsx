@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Children, cloneElement, isValidElement } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
-import { Section, Badge, inp, sel } from "../ui/primitives.jsx";
+import { Section, Badge, Chip, inp, sel } from "../ui/primitives.jsx";
 import { fmtDate, fmtTime, fmtDT, nowDT } from "../lib/datetime.js";
 import NotesList from "../components/NotesList.jsx";
 
@@ -30,7 +30,7 @@ function ControllerNoteBox({ sc, patchField, notify }) {
 }
 
 // Editable / read-only metadata row.
-function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, sc, patchField, notify, isCompleted, editing: extEditing }) {
+function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, multi, bool, sc, patchField, notify, isCompleted, editing: extEditing }) {
   const C = useC();
   const controlled = extEditing !== undefined;
   const [editing, setEditing] = useState(false);
@@ -38,6 +38,11 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
   useEffect(() => setVal(sc[fieldKey] || ""), [sc[fieldKey]]);
   const save = () => { patchField(sc.id, fieldKey, val); setEditing(false); notify("Saved", C.accent); };
   const liveSet = (v) => { setVal(v); patchField(sc.id, fieldKey, v); };
+
+  const arr = Array.isArray(sc[fieldKey]) ? sc[fieldKey] : (sc[fieldKey] ? [sc[fieldKey]] : []);
+  const toggleMulti = (item) => { const next = arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item]; patchField(sc.id, fieldKey, next); };
+  const multiDisplay = arr.length ? arr.join(", ") : "—";
+  const boolDisplay = <span style={{ color: sc[fieldKey] === true ? C.green : sc[fieldKey] === false ? C.red : C.muted }}>{sc[fieldKey] === true ? "✓ YES" : sc[fieldKey] === false ? "✕ NO" : "—"}</span>;
 
   if (children || ro)
     return (
@@ -49,13 +54,17 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
 
   if (controlled)
     return (
-      <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
-        <div style={{ width: 150, fontSize: 13, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", flexShrink: 0 }}>{label}</div>
+      <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: multi ? "flex-start" : "center" }}>
+        <div style={{ width: 150, fontSize: 13, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", flexShrink: 0, paddingTop: multi && extEditing ? 4 : 0 }}>{label}</div>
         {extEditing
-          ? (options
-              ? <select aria-label={label} value={val} onChange={(e) => liveSet(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
-              : <input aria-label={label} type={type} value={type === "date" ? fmtDate(val) : type === "time" ? fmtTime(val) : val} onChange={(e) => liveSet(e.target.value)} style={{ ...inp(C, true), flex: 1, width: "auto" }} />)
-          : <span style={{ flex: 1, fontSize: 13, color: val ? C.text : C.muted }}>{fmt ? fmt(val) : val || "—"}</span>}
+          ? (bool
+              ? <div style={{ display: "flex", gap: 8 }}>{[true, false].map((b) => <button key={String(b)} onClick={() => liveSet(b)} style={{ padding: "6px 16px", borderRadius: 6, border: `1px solid ${sc[fieldKey] === b ? (b ? C.green : C.red) : C.borderHi}`, background: sc[fieldKey] === b ? (b ? C.green + "22" : C.red + "22") : C.card, color: sc[fieldKey] === b ? (b ? C.green : C.red) : C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", fontWeight: 700 }}>{b ? "✓ YES" : "✕ NO"}</button>)}</div>
+              : multi
+                ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>{(options || []).map((o) => <Chip key={o} active={arr.includes(o)} onClick={() => toggleMulti(o)}>{arr.includes(o) ? "✓ " : ""}{o}</Chip>)}</div>
+                : options
+                  ? <select aria-label={label} value={val} onChange={(e) => liveSet(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
+                  : <input aria-label={label} type={type} value={type === "date" ? fmtDate(val) : type === "time" ? fmtTime(val) : val} onChange={(e) => liveSet(e.target.value)} style={{ ...inp(C, true), flex: 1, width: "auto" }} />)
+          : <span style={{ flex: 1, fontSize: 13, color: (bool || multi || val) ? C.text : C.muted }}>{bool ? boolDisplay : multi ? multiDisplay : (fmt ? fmt(val) : val || "—")}</span>}
       </div>
     );
 
@@ -85,25 +94,37 @@ function TimingRow({ label, fieldKey, sc, allCalls, patchField, notify, editing 
   );
 }
 
-// Card that collapses to title + VIEW OR EDIT; expands in place. Independent per card.
-function CollapsibleSection({ title, children }) {
+// Card that collapses to title + View or edit. When open, a single Edit/Done
+// toggle drives all child rows into edit mode at once (live per-field save).
+function CollapsibleSection({ title, children, locked }) {
   const C = useC();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const kids = Children.map(children, (ch) => isValidElement(ch) ? cloneElement(ch, { editing }) : ch);
   return (
     <div style={{ background: C.sectionBg, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: open ? 14 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: open ? 14 : 0, gap: 8 }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>{title}</div>
-        <button onClick={() => setOpen((o) => !o)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "4px 12px", cursor: "pointer", fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>{open ? "Hide" : "View or edit"}</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {open && !locked && <button onClick={() => setEditing((e) => !e)} style={{ background: editing ? C.green : "none", border: `1px solid ${editing ? C.green : C.borderHi}`, color: editing ? (isDark(C) ? "#000" : "#fff") : C.text, borderRadius: 5, padding: "4px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>{editing ? "Done" : "Edit"}</button>}
+          <button onClick={() => setOpen((o) => { if (o) setEditing(false); return !o; })} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "4px 12px", cursor: "pointer", fontSize: 10, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1 }}>{open ? "Hide" : "View or edit"}</button>
+        </div>
       </div>
-      {open && children}
+      {open && kids}
     </div>
   );
 }
 
-export default function CallDetail({ sc, allCalls, patchField, notify, vehicles = [], confirmComplete, setConfirmComplete, markComplete, onTryComplete, onBack, readOnly = false }) {
+export default function CallDetail({ sc, allCalls, patchField, notify, vehicles = [], lists = {}, confirmComplete, setConfirmComplete, markComplete, onTryComplete, onBack, readOnly = false }) {
   const C = useC();
   const isCompleted = sc.status === "complete";
   const locked = isCompleted || readOnly; // no editing affordances when locked
+  const hospitals = lists.hospitals || [];
+  const riderNames = (lists.riders || []).map((r) => String(r.name || r));
+  const itemPicklist = lists.itemPicklist || [];
+  const dutyStatuses = lists.dutyStatuses || [];
+  const meetups = lists.meetups || [];
+  const vehicleList = vehicles.length ? vehicles : (lists.vehicles || []);
   const [timingEdit, setTimingEdit] = useState(false);
   const rowCtx = { sc, patchField, notify, isCompleted: locked };
   const timeCtx = { sc, allCalls, patchField, notify, isCompleted: locked };
@@ -119,7 +140,7 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         <div><button onClick={onBack} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 6 }}>← BACK TO LOG</button><div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'IBM Plex Mono',monospace", color: isCompleted ? C.purple : C.accentText }}>{sc.originHospital} → {sc.destinationHospital}</div><div style={{ marginTop: 6 }}><Badge s={sc.status} /></div>{isCompleted && <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Completed {sc.completedAt}</div>}</div>
         {!locked && (!confirmComplete
           ? <button onClick={onTryComplete} style={{ background: C.purple, border: "none", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, boxShadow: `0 0 20px ${C.purple}44`, flexShrink: 0 }}>✓ MARK COMPLETE</button>
-          : <div style={{ background: C.confirmBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: "14px 18px", textAlign: "center", minWidth: 200 }}><div style={{ fontSize: 12, color: C.text, marginBottom: 10, fontFamily: "'IBM Plex Mono',monospace" }}>Move to Completed Calls?</div><div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>This will archive the record.</div><div style={{ display: "flex", gap: 8 }}><button onClick={() => markComplete(sc.id)} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button><button onClick={() => setConfirmComplete(false)} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button></div></div>
+          : <div style={{ background: C.confirmBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: "14px 18px", textAlign: "center", minWidth: 200 }}><div style={{ fontSize: 13, color: C.text, marginBottom: 12, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", fontWeight: 700 }}>Mark Complete</div><div style={{ display: "flex", gap: 8 }}><button onClick={() => markComplete(sc.id)} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button><button onClick={() => setConfirmComplete(false)} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button></div></div>
         )}
       </div>
       <div style={{ background: C.sectionBg, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
@@ -135,7 +156,7 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         <TimingRow {...timeCtx} editing={timingEdit} label="Rider home" fieldKey="riderHome" />
         {isCompleted && <TimingRow {...timeCtx} label="Completed at" fieldKey="completedAt" />}
       </div>
-      <CollapsibleSection title="Call date and time">
+      <CollapsibleSection title="Call date and time" locked={locked}>
         <EditRow {...rowCtx} label="Timestamp" readOnly><span>{fmtDT(sc.timestamp)}</span></EditRow>
         <EditRow {...rowCtx} label="Time of call" fieldKey="timeOfCall" type="time" fmt={fmtTime} />
         <EditRow {...rowCtx} label="Date of call" fieldKey="dateOfCallFromHospital" type="date" fmt={fmtDate} />
@@ -144,30 +165,30 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         <EditRow {...rowCtx} label="Date call received" fieldKey="dateCallReceived" type="date" fmt={fmtDate} />
         <EditRow {...rowCtx} label="Rider called" readOnly><span style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{fmtTime(sc.riderCalled)}</span></EditRow>
       </CollapsibleSection>
-      <CollapsibleSection title="Route">
-        <EditRow {...rowCtx} label="Origin" readOnly><span>{sc.originHospital}</span></EditRow>
-        <EditRow {...rowCtx} label="Destination" readOnly><span>{sc.destinationHospital}</span></EditRow>
-        <EditRow {...rowCtx} label="Items" readOnly><span>{Array.isArray(sc.itemsTransported) ? sc.itemsTransported.join(", ") : sc.itemsTransported || "—"}</span></EditRow>
+      <CollapsibleSection title="Route" locked={locked}>
+        <EditRow {...rowCtx} label="Origin" fieldKey="originHospital" options={hospitals} />
+        <EditRow {...rowCtx} label="Destination" fieldKey="destinationHospital" options={hospitals} />
+        <EditRow {...rowCtx} label="Items" fieldKey="itemsTransported" multi options={itemPicklist} />
         <EditRow {...rowCtx} label="No. of packages" fieldKey="numPackages" type="number" />
       </CollapsibleSection>
       {(sc.contactName || sc.contactPhone || sc.pickupAddress || sc.dropOffAddress) && (
-        <CollapsibleSection title="Contact">
+        <CollapsibleSection title="Contact" locked={locked}>
           {sc.contactName && <EditRow {...rowCtx} label="Contact name" fieldKey="contactName" />}
           {sc.contactPhone && <EditRow {...rowCtx} label="Contact phone" fieldKey="contactPhone" type="tel" />}
           {sc.pickupAddress && <EditRow {...rowCtx} label="Pick-up address" fieldKey="pickupAddress" />}
           {sc.dropOffAddress && <EditRow {...rowCtx} label="Drop-off address" fieldKey="dropOffAddress" />}
         </CollapsibleSection>
       )}
-      <CollapsibleSection title="Crew & vehicle">
-        <EditRow {...rowCtx} label="Rider(s)" readOnly><span>{Array.isArray(sc.riders) ? sc.riders.join(", ") : sc.riders || "—"}</span></EditRow>
-        <EditRow {...rowCtx} label="Duty status" readOnly><span>{sc.riderDutyStatus || "—"}</span></EditRow>
-        <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicles} />
-        <EditRow {...rowCtx} label="Meet other group" readOnly><span>{Array.isArray(sc.meetOtherGroup) ? sc.meetOtherGroup.join(", ") || "—" : sc.meetOtherGroup || "—"}</span></EditRow>
+      <CollapsibleSection title="Crew & vehicle" locked={locked}>
+        <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" multi options={riderNames} />
+        <EditRow {...rowCtx} label="Duty status" fieldKey="riderDutyStatus" options={dutyStatuses} />
+        <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicleList} />
+        <EditRow {...rowCtx} label="Meet other group" fieldKey="meetOtherGroup" multi options={meetups} />
         <EditRow {...rowCtx} label="Meet-up date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate} />
         <EditRow {...rowCtx} label="Meet-up time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
-        <EditRow {...rowCtx} label="Green lights" readOnly><span style={{ color: sc.greenLights === true ? C.green : sc.greenLights === false ? C.red : C.muted }}>{sc.greenLights === true ? "✓ YES" : sc.greenLights === false ? "✕ NO" : "—"}</span></EditRow>
+        <EditRow {...rowCtx} label="Green lights" fieldKey="greenLights" bool />
       </CollapsibleSection>
-      <CollapsibleSection title="Notes">
+      <CollapsibleSection title="Notes" locked={locked}>
         <NotesList notes={sc.notes} />
         {!locked && <ControllerNoteBox sc={sc} patchField={patchField} notify={notify} />}
       </CollapsibleSection>

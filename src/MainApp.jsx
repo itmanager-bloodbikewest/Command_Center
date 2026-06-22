@@ -257,7 +257,7 @@ export default function MainApp({ session, onLogout }) {
 
       {isControl && view === "detail" && selectedCall && (
         <CallDetail
-          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles} lists={lists}
           confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
           markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("log")}
         />
@@ -287,7 +287,7 @@ export default function MainApp({ session, onLogout }) {
 
       {isAdminView && view === "admin-detail" && selectedCall && (
         <CallDetail
-          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles}
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles} lists={lists}
           confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
           markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("admin-list")}
           readOnly={!loggedByMe(selectedCall)}

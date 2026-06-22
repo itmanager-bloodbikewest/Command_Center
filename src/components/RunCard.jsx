@@ -50,8 +50,7 @@ export function RunCard({ rc, onClickView, onComplete, vehicles = [] }) {
             </>
           ) : (
             <>
-              <div style={{ fontSize: 12, color: C.text, marginBottom: 6, fontFamily: "'IBM Plex Mono',monospace" }}>Move to Completed Calls?</div>
-              <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>This will archive the record.</div>
+              <div style={{ fontSize: 13, color: C.text, marginBottom: 12, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", fontWeight: 700 }}>Mark Complete</div>
             </>
           )}
           <div style={{ display: "flex", gap: 8 }}>

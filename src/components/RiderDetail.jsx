@@ -25,26 +25,28 @@ const sheetBtn = (C) => ({
   padding: "14px 16px", marginBottom: 10, cursor: "pointer", textAlign: "left",
 });
 
-// Bottom-sheet asking the rider which channel to message the controller on.
-function ChannelChooser({ C, label, controllerName, onPick, onCancel }) {
+// Bottom-sheet asking the rider how to update the controller after a status change.
+function ChannelChooser({ C, onPick, onCancel }) {
   return (
     <div onClick={onCancel}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000 }}>
       <div onClick={(e) => e.stopPropagation()}
         style={{ background: C.panel, borderTop: `1px solid ${C.borderHi}`, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "18px 18px 24px", width: "100%", maxWidth: 480, boxShadow: "0 -8px 40px rgba(0,0,0,0.4)" }}>
         <div style={{ width: 36, height: 4, background: C.borderHi, borderRadius: 2, margin: "0 auto 16px" }} />
-        <div style={{ textAlign: "center", marginBottom: 4, fontSize: 16, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>
-          Send “{label}” to {controllerName || "controller"}
-        </div>
-        <div style={{ textAlign: "center", marginBottom: 18, fontSize: 12, color: C.muted }}>
-          This opens your Messages app with the update ready to send.
+        <div style={{ textAlign: "center", marginBottom: 18, fontSize: 16, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>
+          Update Controller
         </div>
         <button onClick={() => onPick("sms")} style={sheetBtn(C)}>
           <span style={{ fontSize: 20 }}>💬</span>
-          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.3 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Text message</span>
-            <span style={{ fontSize: 11, color: C.muted }}>Opens your Messages app</span>
-          </span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Text</span>
+        </button>
+        <button onClick={() => onPick("call")} style={sheetBtn(C)}>
+          <span style={{ fontSize: 20 }}>📞</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Call</span>
+        </button>
+        <button onClick={() => onPick("none")} style={sheetBtn(C)}>
+          <span style={{ fontSize: 20 }}>🚫</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>No Thanks</span>
         </button>
         <button onClick={onCancel}
           style={{ width: "100%", background: "none", border: "none", color: C.muted, padding: "12px", fontSize: 13, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", marginTop: 6 }}>
@@ -72,13 +74,13 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
     else handler();
   };
 
-  // Channel picked: commit the status, then open the messaging draft.
+  // Option picked: commit the status, then act on the channel (text / call / none).
   const pickChannel = (channel) => {
     if (!chooser) return;
-    const { label, handler } = chooser;
-    handler(); // status write — this is the commit point
-    const link = smsLink(c.controllerPhone, label);
-    if (link) window.location.href = link;
+    const { handler, label } = chooser;
+    handler(); // status write — this is the commit point for all options
+    if (channel === "sms") { const link = smsLink(c.controllerPhone, label); if (link) window.location.href = link; }
+    else if (channel === "call" && c.controllerPhone) { window.location.href = `tel:${c.controllerPhone}`; }
     setChooser(null);
   };
 
@@ -153,8 +155,7 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
         </Section>
       </div>
       {chooser && (
-        <ChannelChooser C={C} label={chooser.label} controllerName={c.controllerName}
-          onPick={pickChannel} onCancel={() => setChooser(null)} />
+        <ChannelChooser C={C} onPick={pickChannel} onCancel={() => setChooser(null)} />
       )}
     </div>
   );
