@@ -28,7 +28,7 @@ export default function LoginScreen({ onLogin }) {
   };
 
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'IBM Plex Sans',sans-serif" }}>
+    <div style={{ background: C.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <div style={{ textAlign: "center", marginBottom: 40 }}>
         <img src="/logo.png" alt="Blood Bike West" style={{ width: 80, marginBottom: 8 }} />

@@ -14,8 +14,9 @@ export default function NewCallForm({
   const [newGroup, setNewGroup] = useState("");
   const [confirmLeave, setConfirmLeave] = useState(false);
 
-  const reqBg  = isDark(C) ? "#3a3320" : "#fffbe0"; // required, not prefilled -> light yellow
-  const autoBg = isDark(C) ? "#1c2738" : "#e9f2ff"; // auto-captured -> light blue
+  const reqFrame = { border: `2px solid ${C.accent}` };   // required -> 2px accent frame
+  const autoBg = "transparent";                            // auto-captured -> neutral (AUTO chip carries meaning)
+  const reqBg = "transparent";                             // (kept name; required now uses the frame, not a fill)
   const isOtherNotes = (item) => { const l = String(item).toLowerCase(); return l.includes("other") && l.includes("note"); };
 
   // "Other (Add to Notes)" notes popup (replaces former scroll-to-focus behaviour)
@@ -73,41 +74,41 @@ export default function NewCallForm({
       <button onClick={() => setConfirmLeave(true)} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 10 }}>← BACK</button>
       <div style={{ fontSize: 10, color: C.muted, fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 2, marginBottom: 18 }}>NEW CALL — * REQUIRED FIELDS</div>
 
-      <Section title="Call Date and Time">
+      <Section title="Call date and time">
         <Grid cols={2}>
-          <div><Label>Time of Call from Hospital *</Label><input type="time" aria-label="Time of Call from Hospital" value={form.timeOfCall} onChange={(e) => fset("timeOfCall", e.target.value)} style={{ ...inp(C), width: "100%", background: reqBg }} /></div>
-          <div><Label auto>Date of Call from Hospital</Label><input type="date" aria-label="Date of Call from Hospital (auto)" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%", background: autoBg }} /></div>
-          <div><Label>Transport Date *</Label><input type="date" aria-label="Transport Date" value={form.transportDate} onChange={(e) => fset("transportDate", e.target.value)} style={{ ...inp(C), width: "100%", background: reqBg }} /></div>
+          <div><Label required filled={!!form.timeOfCall}>Time of call from hospital</Label><input type="time" aria-label="Time of call from hospital" value={form.timeOfCall} onChange={(e) => fset("timeOfCall", e.target.value)} style={{ ...inp(C), width: "100%", ...reqFrame }} /></div>
+          <div><Label auto>Date of call from hospital</Label><input type="date" aria-label="Date of Call from Hospital (auto)" value={form.dateOfCallFromHospital} onChange={(e) => fset("dateOfCallFromHospital", e.target.value)} style={{ ...inp(C), width: "100%", background: autoBg }} /></div>
+          <div><Label required filled={!!form.transportDate}>Transport date</Label><input type="date" aria-label="Transport date" value={form.transportDate} onChange={(e) => fset("transportDate", e.target.value)} style={{ ...inp(C), width: "100%", ...reqFrame }} /></div>
         </Grid>
       </Section>
 
       <Section title="Route">
         <Grid cols={1}>
-          <LocationField label="Origin *" value={form.originHospital} onChange={(v) => fset("originHospital", v)} options={hospitals} exclude={[form.destinationHospital]} onAdd={onAddLocation} bg={reqBg} />
-          <LocationField label="Destination *" value={form.destinationHospital} onChange={(v) => fset("destinationHospital", v)} options={hospitals} exclude={[form.originHospital]} onAdd={onAddLocation} bg={reqBg} />
+          <LocationField label="Origin" required filled={!!form.originHospital} value={form.originHospital} onChange={(v) => fset("originHospital", v)} options={hospitals} exclude={[form.destinationHospital]} onAdd={onAddLocation} />
+          <LocationField label="Destination" required filled={!!form.destinationHospital} value={form.destinationHospital} onChange={(v) => fset("destinationHospital", v)} options={hospitals} exclude={[form.originHospital]} onAdd={onAddLocation} />
         </Grid>
       </Section>
 
-      <Section title="Items Transported">
+      <Section title="Items transported">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
           {itemPicklist.map((item) => <Chip key={item} active={form.itemsTransported.includes(item)} onClick={() => { const wasActive = form.itemsTransported.includes(item); ftog("itemsTransported", item); if (!wasActive && isOtherNotes(item)) openOtherNotes(); }}>{form.itemsTransported.includes(item) ? "✓ " : ""}{item}</Chip>)}
         </div>
         {(() => { const shown = form.itemsTransported.filter((i) => !isOtherNotes(i)); return shown.length > 0 && <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>{shown.map((i) => <span key={i} style={{ background: C.accent + "22", color: C.accentText, border: `1px solid ${C.accent}44`, borderRadius: 12, padding: "3px 10px", fontSize: 11 }}>{i} <span onClick={() => ftog("itemsTransported", i)} style={{ cursor: "pointer", marginLeft: 4, color: C.red }}>×</span></span>)}</div>; })()}
-        <div style={{ marginTop: 14 }}><Label>Number of Packages *</Label><input type="number" min="1" aria-label="Number of Packages" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120, background: reqBg }} /></div>
+        <div style={{ marginTop: 14 }}><Label required filled={Number(form.numPackages) >= 1}>Number of packages</Label><input type="number" min="1" aria-label="Number of packages" value={form.numPackages} onChange={(e) => fset("numPackages", e.target.value)} placeholder="0" style={{ ...inp(C), width: 120, ...reqFrame }} /></div>
       </Section>
 
-      <Section title="Crew & Vehicle">
+      <Section title="Crew & vehicle">
         <Grid cols={1} gap={12}>
-          <div><Label>Rider *</Label>
-            <select aria-label="Rider" value={form.riders[0] || ""} onChange={(e) => fset("riders", e.target.value ? [e.target.value] : [])} style={{ ...sel(C), width: "100%", background: reqBg }}>
+          <div><Label required filled={form.riders.length > 0}>Rider</Label>
+            <select aria-label="Rider" value={form.riders[0] || ""} onChange={(e) => fset("riders", e.target.value ? [e.target.value] : [])} style={{ ...sel(C), width: "100%", ...reqFrame }}>
               <option value="">— Select Rider —</option>
               {riders.map((r, i) => <option key={i}>{String(r.name || r)}</option>)}
             </select>
           </div>
-          <div><Label>Rider Duty Status</Label><select aria-label="Rider Duty Status" value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
-          <div><Label>Vehicle Used</Label><select aria-label="Vehicle Used" value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
+          <div><Label>Rider duty status</Label><select aria-label="Rider duty status" value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
+          <div><Label>Vehicle used</Label><select aria-label="Vehicle used" value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%" }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
           <div>
-            <Label optional>Meet with Other Group</Label>
+            <Label optional>Meet with other group</Label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 4 }}>
               {meetups.map((g) => {
                 const active = Array.isArray(form.meetOtherGroup) && form.meetOtherGroup.includes(g);
@@ -123,39 +124,39 @@ export default function NewCallForm({
             </div>
           </div>
           <Grid cols={2}>
-            <div><Label optional>Scheduled Meet-up Date</Label><input type="date" aria-label="Scheduled Meet-up Date" value={form.scheduledMeetupDate} onChange={(e) => fset("scheduledMeetupDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
-            <div><Label optional>Scheduled Meet-up Time</Label><input type="time" aria-label="Scheduled Meet-up Time" value={form.scheduledMeetupTime} onChange={(e) => fset("scheduledMeetupTime", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+            <div><Label optional>Scheduled meet-up date</Label><input type="date" aria-label="Scheduled meet-up date" value={form.scheduledMeetupDate} onChange={(e) => fset("scheduledMeetupDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+            <div><Label optional>Scheduled meet-up time</Label><input type="time" aria-label="Scheduled meet-up time" value={form.scheduledMeetupTime} onChange={(e) => fset("scheduledMeetupTime", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
           </Grid>
         </Grid>
       </Section>
 
       <Section title="Authorisation">
-        <Label>Green Lights Authorised</Label>
+        <Label>Green lights authorised</Label>
         <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
           {[true, false].map((val) => <button key={String(val)} onClick={() => fset("greenLights", val)} style={{ padding: "8px 24px", borderRadius: 7, border: `1px solid ${form.greenLights === val ? (val ? C.green : C.red) : C.borderHi}`, background: form.greenLights === val ? (val ? C.green + "22" : C.red + "22") : C.card, color: form.greenLights === val ? (val ? C.green : C.red) : C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>{val ? "✓  YES" : "✕  NO"}</button>)}
         </div>
       </Section>
 
-      <Section title="Optional Details">
+      <Section title="Optional details">
         <Grid cols={1} gap={12}>
-          <div><Label optional>Contact Name</Label><input aria-label="Contact Name" value={form.contactName} onChange={(e) => fset("contactName", e.target.value)} placeholder="Name of contact" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Contact Phone Number</Label><input type="tel" aria-label="Contact Phone Number" value={form.contactPhone} onChange={(e) => fset("contactPhone", e.target.value)} placeholder="+353…" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Pick-up Address</Label><input aria-label="Pick-up Address" value={form.pickupAddress} onChange={(e) => fset("pickupAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
-          <div><Label optional>Drop-off Address</Label><input aria-label="Drop-off Address" value={form.dropOffAddress} onChange={(e) => fset("dropOffAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label optional>Contact name</Label><input aria-label="Contact name" value={form.contactName} onChange={(e) => fset("contactName", e.target.value)} placeholder="Name of contact" style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label optional>Contact phone number</Label><input type="tel" aria-label="Contact phone number" value={form.contactPhone} onChange={(e) => fset("contactPhone", e.target.value)} placeholder="+353…" style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label optional>Pick-up address</Label><input aria-label="Pick-up address" value={form.pickupAddress} onChange={(e) => fset("pickupAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
+          <div><Label optional>Drop-off address</Label><input aria-label="Drop-off address" value={form.dropOffAddress} onChange={(e) => fset("dropOffAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
         </Grid>
       </Section>
 
-      <Section title="AUTOMATED TIMESTAMPS - EDIT ONLY IF REQUIRED">
+      <Section title="Automated timestamps — edit only if required">
         <Grid cols={2}>
-          <AutoTime label="Rider Called" value={form.riderCalled} fieldKey="riderCalled" overrides={form.overrides} onOverride={handleOverride} note="auto on New Call" />
-          <AutoTime label="Pickup Time" value={form.pickupTime} fieldKey="pickupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Picked Up" />
+          <AutoTime label="Rider called" value={form.riderCalled} fieldKey="riderCalled" overrides={form.overrides} onOverride={handleOverride} note="auto on New Call" />
+          <AutoTime label="Pickup time" value={form.pickupTime} fieldKey="pickupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Picked Up" />
           <AutoTime label="Meet-up Time (actual)" value={form.meetupTime} fieldKey="meetupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Dropped Off" />
-          <AutoTime label="Delivery Time" value={form.deliveryTime} fieldKey="deliveryTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Dropped Off" />
-          <AutoTime label="Rider Home" value={form.riderHome} fieldKey="riderHome" overrides={form.overrides} onOverride={handleOverride} note="auto on Rider Home" />
+          <AutoTime label="Delivery time" value={form.deliveryTime} fieldKey="deliveryTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Dropped Off" />
+          <AutoTime label="Rider home" value={form.riderHome} fieldKey="riderHome" overrides={form.overrides} onOverride={handleOverride} note="auto on Rider Home" />
         </Grid>
       </Section>
 
-      <Section title="Other Details / Notes">
+      <Section title="Other details / notes">
         <textarea aria-label="Notes" value={form.notes} onChange={(e) => fset("notes", e.target.value)} rows={3} placeholder="Additional details, special instructions, observations…" style={{ ...inp(C), width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: 1.7 }} />
       </Section>
 

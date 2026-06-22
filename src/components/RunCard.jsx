@@ -26,16 +26,16 @@ export function RunCard({ rc, onClickView, onComplete, vehicles = [] }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 8 }}>
         <Badge s={rc.status} />
         {showComplete && !open && (
-          <button onClick={openPanel} style={{ background: C.purple, border: "none", color: "#fff", padding: "6px 12px", borderRadius: 6, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>✓ MARK COMPLETE</button>
+          <button onClick={openPanel} style={{ background: C.purple, border: "none", color: "#fff", padding: "6px 12px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", fontWeight: 700, flexShrink: 0 }}>✓ Mark complete</button>
         )}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2, color: C.text }}>{rc.originHospital} <span style={{ color: C.muted, fontWeight: 400 }}>→</span> {rc.destinationHospital}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 3, color: C.text }}>{rc.originHospital} <span style={{ color: C.muted, fontWeight: 400 }}>→</span> {rc.destinationHospital}</div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-        <div style={{ fontSize: 11, color: C.muted }}>{Array.isArray(rc.itemsTransported) ? rc.itemsTransported.join(", ") : rc.itemsTransported || "—"}</div>
-        <div style={{ fontSize: 11, color: C.muted, textAlign: "right" }}>{Array.isArray(rc.riders) ? rc.riders.join(", ") : rc.riders || "—"}</div>
+        <div style={{ fontSize: 13, color: C.text }}>{Array.isArray(rc.itemsTransported) ? rc.itemsTransported.join(", ") : rc.itemsTransported || "—"}</div>
+        <div style={{ fontSize: 13, color: C.text, textAlign: "right" }}>{Array.isArray(rc.riders) ? rc.riders.join(", ") : rc.riders || "—"}</div>
       </div>
-      <div style={{ fontSize: 10, color: C.muted, marginTop: 4, fontFamily: "'IBM Plex Mono',monospace" }}>{fmtDT(done ? rc.completedAt : rc.timestamp)}</div>
-      {showComplete && <div style={{ fontSize: 10, color: C.muted, marginTop: 4, fontFamily: "'IBM Plex Mono',monospace" }}>Vehicle: {rc.vehicleUsed ? rc.vehicleUsed : <span style={{ color: C.red, fontWeight: 700 }}>missing</span>}</div>}
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 5, fontFamily: "'IBM Plex Mono',monospace" }}>{fmtDT(done ? rc.completedAt : rc.timestamp)}</div>
+      {showComplete && <div style={{ fontSize: 13, color: C.text, marginTop: 5, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>Vehicle: {rc.vehicleUsed ? rc.vehicleUsed : <span style={{ color: C.red, fontWeight: 700 }}>missing</span>}</div>}
 
       {open && (
         <div onClick={stop} style={{ marginTop: 12, background: C.sectionBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: 14 }}>
@@ -55,8 +55,8 @@ export function RunCard({ rc, onClickView, onComplete, vehicles = [] }) {
             </>
           )}
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={confirmComplete} disabled={!canConfirm} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: 10, borderRadius: 6, fontSize: 11, cursor: canConfirm ? "pointer" : "not-allowed", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, opacity: canConfirm ? 1 : 0.4 }}>CONFIRM</button>
-            <button onClick={cancelPanel} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: 10, borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button>
+            <button onClick={confirmComplete} disabled={!canConfirm} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: 10, borderRadius: 6, fontSize: 11, cursor: canConfirm ? "pointer" : "not-allowed", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, opacity: canConfirm ? 1 : 0.4 }}>Confirm</button>
+            <button onClick={cancelPanel} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: 10, borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>Cancel</button>
           </div>
         </div>
       )}
@@ -64,7 +64,7 @@ export function RunCard({ rc, onClickView, onComplete, vehicles = [] }) {
   );
 }
 
-const groupLabel = (C, color, top) => ({ fontSize: 9, letterSpacing: 3, color, fontFamily: "'IBM Plex Mono',monospace", marginBottom: 10, ...(top ? { marginTop: 24 } : {}) });
+const groupLabel = (C, color, top) => ({ fontSize: 13, fontWeight: 700, color, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", marginBottom: 10, ...(top ? { marginTop: 24 } : {}) });
 
 // Active run section. Completed runs are intentionally not shown in the app —
 // once completed they live only in the CompletedCalls sheet (the spreadsheet run log).
@@ -73,7 +73,7 @@ export function RunGroups({ active, onOpen, onComplete, vehicles }) {
   if (active.length === 0) return null;
   return (
     <>
-      <div style={groupLabel(C, C.orange)}>ACTIVE — {active.length} RUN{active.length !== 1 ? "S" : ""}</div>
+      <div style={groupLabel(C, C.orange)}>Active — {active.length} run{active.length !== 1 ? "s" : ""}</div>
       {active.map((rc) => <RunCard key={rc.id} rc={rc} onClickView={() => onOpen(rc.id)} onComplete={onComplete} vehicles={vehicles} />)}
     </>
   );

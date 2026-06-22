@@ -188,7 +188,7 @@ export default function MainApp({ session, onLogout }) {
   };
 
   return (
-    <div style={{ fontFamily: "'IBM Plex Sans',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, display: "flex", flexDirection: "column" }}>
+    <div style={{ fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, display: "flex", flexDirection: "column" }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <style>{`
         .bbw-header{display:flex;align-items:center;gap:8px;height:56px;padding:0 16px;flex-shrink:0}
