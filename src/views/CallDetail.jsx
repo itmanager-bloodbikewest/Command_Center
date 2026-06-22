@@ -30,12 +30,14 @@ function ControllerNoteBox({ sc, patchField, notify }) {
 }
 
 // Editable / read-only metadata row.
-function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, sc, patchField, notify, isCompleted }) {
+function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, sc, patchField, notify, isCompleted, editing: extEditing }) {
   const C = useC();
+  const controlled = extEditing !== undefined;
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(sc[fieldKey] || "");
   useEffect(() => setVal(sc[fieldKey] || ""), [sc[fieldKey]]);
   const save = () => { patchField(sc.id, fieldKey, val); setEditing(false); notify("Saved", C.accent); };
+  const liveSet = (v) => { setVal(v); patchField(sc.id, fieldKey, v); };
 
   if (children || ro)
     return (
@@ -44,6 +46,19 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
         <div style={{ fontSize: 13, color: C.text, flex: 1 }}>{children || (fmt ? fmt(sc[fieldKey]) : sc[fieldKey]) || "—"}</div>
       </div>
     );
+
+  if (controlled)
+    return (
+      <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
+        <div style={{ width: 150, fontSize: 13, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", flexShrink: 0 }}>{label}</div>
+        {extEditing
+          ? (options
+              ? <select aria-label={label} value={val} onChange={(e) => liveSet(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
+              : <input aria-label={label} type={type} value={type === "date" ? fmtDate(val) : type === "time" ? fmtTime(val) : val} onChange={(e) => liveSet(e.target.value)} style={{ ...inp(C, true), flex: 1, width: "auto" }} />)
+          : <span style={{ flex: 1, fontSize: 13, color: val ? C.text : C.muted }}>{fmt ? fmt(val) : val || "—"}</span>}
+      </div>
+    );
+
   return (
     <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
       <div style={{ width: 150, fontSize: 13, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", flexShrink: 0 }}>{label}</div>
@@ -56,20 +71,16 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
   );
 }
 
-// Timing value with inline override.
-function TimingRow({ label, fieldKey, note, sc, allCalls, patchField, notify, isCompleted }) {
+// Timing value. When `editing` is set, shows a time input that saves live; otherwise shows the recorded value.
+function TimingRow({ label, fieldKey, sc, allCalls, patchField, notify, editing }) {
   const C = useC();
   const val = allCalls.find((x) => x.id === sc.id)?.[fieldKey] || "";
-  const [ov, setOv] = useState(false);
-  const [ovVal, setOvVal] = useState(val);
-  useEffect(() => setOvVal(val), [val]);
-  const saveOv = () => { patchField(sc.id, fieldKey, ovVal); setOv(false); notify("Override saved", C.accent); };
   return (
     <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
       <div style={{ width: 150, fontSize: 13, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", flexShrink: 0 }}>{label}</div>
-      {ov
-        ? <div style={{ display: "flex", gap: 6, flex: 1 }}><input aria-label={`${label} override`} type="time" value={ovVal} onChange={(e) => setOvVal(e.target.value)} autoFocus style={{ ...inp(C, true), width: 120 }} /><button onClick={saveOv} style={{ background: C.green, color: isDark(C) ? "#000" : "#fff", border: "none", borderRadius: 5, padding: "0 12px", cursor: "pointer", fontSize: 11, fontFamily: "'IBM Plex Mono',monospace" }}>SAVE</button><button aria-label="Cancel override" onClick={() => setOv(false)} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "0 10px", cursor: "pointer", fontSize: 11 }}>✕</button></div>
-        : <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}><span style={{ fontSize: 14, fontWeight: 600, fontFamily: "'IBM Plex Mono',monospace", color: val ? C.text : C.borderHi }}>{val ? fmtTime(val) : "pending…"}</span>{val && <span style={{ fontSize: 9, color: C.green, background: C.green + "22", padding: "1px 6px", borderRadius: 8 }}>Recorded</span>}{note && !val && <span style={{ fontSize: 9, color: C.muted, fontStyle: "italic" }}>{note}</span>}{!isCompleted && <button onClick={() => setOv(true)} style={{ marginLeft: "auto", background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 10, fontFamily: "'IBM Plex Mono',monospace" }}>✎ override</button>}</div>}
+      {editing
+        ? <input aria-label={label} type="time" value={val ? fmtTime(val) : ""} onChange={(e) => patchField(sc.id, fieldKey, e.target.value)} style={{ ...inp(C, true), width: 140 }} />
+        : <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}><span style={{ fontSize: 14, fontWeight: 600, fontFamily: "'IBM Plex Mono',monospace", color: val ? C.text : C.borderHi }}>{val ? fmtTime(val) : "pending…"}</span>{val && <span style={{ fontSize: 9, color: C.green, background: C.green + "22", padding: "1px 6px", borderRadius: 8 }}>Recorded</span>}</div>}
     </div>
   );
 }
@@ -93,6 +104,7 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
   const C = useC();
   const isCompleted = sc.status === "complete";
   const locked = isCompleted || readOnly; // no editing affordances when locked
+  const [timingEdit, setTimingEdit] = useState(false);
   const rowCtx = { sc, patchField, notify, isCompleted: locked };
   const timeCtx = { sc, allCalls, patchField, notify, isCompleted: locked };
 
@@ -110,15 +122,19 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
           : <div style={{ background: C.confirmBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: "14px 18px", textAlign: "center", minWidth: 200 }}><div style={{ fontSize: 12, color: C.text, marginBottom: 10, fontFamily: "'IBM Plex Mono',monospace" }}>Move to Completed Calls?</div><div style={{ fontSize: 11, color: C.muted, marginBottom: 14 }}>This will archive the record.</div><div style={{ display: "flex", gap: 8 }}><button onClick={() => markComplete(sc.id)} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button><button onClick={() => setConfirmComplete(false)} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button></div></div>
         )}
       </div>
-      <Section title="Timing log">
-        <TimingRow {...timeCtx} label="Rider called" fieldKey="riderCalled" />
-        <TimingRow {...timeCtx} label="Pickup time" fieldKey="pickupTime" note="triggers on rider Picked Up" />
-        <EditRow {...rowCtx} label="Scheduled meet-up" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
-        <TimingRow {...timeCtx} label="Actual meet-up" fieldKey="meetupTime" note="triggers on rider Dropped Off" />
-        <TimingRow {...timeCtx} label="Delivery time" fieldKey="deliveryTime" note="triggers on rider Dropped Off" />
-        <TimingRow {...timeCtx} label="Rider home" fieldKey="riderHome" note="triggers on rider Rider Home" />
+      <div style={{ background: C.sectionBg, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>Timing log</div>
+          {!locked && <button onClick={() => setTimingEdit((e) => !e)} style={{ background: timingEdit ? C.green : "none", border: `1px solid ${timingEdit ? C.green : C.borderHi}`, color: timingEdit ? (isDark(C) ? "#000" : "#fff") : C.text, borderRadius: 6, padding: "5px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>{timingEdit ? "Done" : "Edit"}</button>}
+        </div>
+        <TimingRow {...timeCtx} editing={timingEdit} label="Rider called" fieldKey="riderCalled" />
+        <TimingRow {...timeCtx} editing={timingEdit} label="Pickup time" fieldKey="pickupTime" />
+        <EditRow {...rowCtx} editing={timingEdit} label="Scheduled meet-up" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
+        <TimingRow {...timeCtx} editing={timingEdit} label="Actual meet-up" fieldKey="meetupTime" />
+        <TimingRow {...timeCtx} editing={timingEdit} label="Delivery time" fieldKey="deliveryTime" />
+        <TimingRow {...timeCtx} editing={timingEdit} label="Rider home" fieldKey="riderHome" />
         {isCompleted && <TimingRow {...timeCtx} label="Completed at" fieldKey="completedAt" />}
-      </Section>
+      </div>
       <CollapsibleSection title="Call date and time">
         <EditRow {...rowCtx} label="Timestamp" readOnly><span>{fmtDT(sc.timestamp)}</span></EditRow>
         <EditRow {...rowCtx} label="Time of call" fieldKey="timeOfCall" type="time" fmt={fmtTime} />

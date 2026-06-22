@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { useC, isDark } from "../lib/theme.jsx";
+import { useC } from "../lib/theme.jsx";
 import { Section, Grid, Label, Chip, inp, sel } from "../ui/primitives.jsx";
 import LocationField from "../components/LocationField.jsx";
-import AutoTime from "../components/AutoTime.jsx";
 
 export default function NewCallForm({
-  form, fset, ftog, handleOverride,
+  form, fset, ftog,
   lists, onAddLocation, onAddMeetup,
   onSubmit, onCancel,
 }) {
@@ -143,16 +142,6 @@ export default function NewCallForm({
           <div><Label optional>Contact phone number</Label><input type="tel" aria-label="Contact phone number" value={form.contactPhone} onChange={(e) => fset("contactPhone", e.target.value)} placeholder="+353…" style={{ ...inp(C), width: "100%" }} /></div>
           <div><Label optional>Pick-up address</Label><input aria-label="Pick-up address" value={form.pickupAddress} onChange={(e) => fset("pickupAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
           <div><Label optional>Drop-off address</Label><input aria-label="Drop-off address" value={form.dropOffAddress} onChange={(e) => fset("dropOffAddress", e.target.value)} placeholder="Street address / dept" style={{ ...inp(C), width: "100%" }} /></div>
-        </Grid>
-      </Section>
-
-      <Section title="Automated timestamps — edit only if required">
-        <Grid cols={2}>
-          <AutoTime label="Rider called" value={form.riderCalled} fieldKey="riderCalled" overrides={form.overrides} onOverride={handleOverride} note="auto on New Call" />
-          <AutoTime label="Pickup time" value={form.pickupTime} fieldKey="pickupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Picked Up" />
-          <AutoTime label="Meet-up Time (actual)" value={form.meetupTime} fieldKey="meetupTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Dropped Off" />
-          <AutoTime label="Delivery time" value={form.deliveryTime} fieldKey="deliveryTime" overrides={form.overrides} onOverride={handleOverride} note="auto on Dropped Off" />
-          <AutoTime label="Rider home" value={form.riderHome} fieldKey="riderHome" overrides={form.overrides} onOverride={handleOverride} note="auto on Rider Home" />
         </Grid>
       </Section>
 

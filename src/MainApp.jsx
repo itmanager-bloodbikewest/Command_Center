@@ -91,13 +91,7 @@ export default function MainApp({ session, onLogout }) {
 
   const fset = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const ftog = (k, v) => setForm((f) => ({ ...f, [k]: f[k].includes(v) ? f[k].filter((x) => x !== v) : [...f[k], v] }));
-  const handleOverride = (fk, val) => {
-    setForm((f) => {
-      const ov = { ...f.overrides };
-      if (val === null) { delete ov[fk]; return { ...f, overrides: ov }; }
-      return { ...f, [fk]: val, overrides: { ...ov, [fk]: true } };
-    });
-  };
+
   useEffect(() => { if (!form.overrides?.dateCallReceived) setForm((f) => ({ ...f, dateCallReceived: f.transportDate })); }, [form.transportDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onAddLocation = (v) => {
@@ -255,7 +249,7 @@ export default function MainApp({ session, onLogout }) {
 
       {isControl && view === "newcall" && (
         <NewCallForm
-          form={form} fset={fset} ftog={ftog} handleOverride={handleOverride}
+          form={form} fset={fset} ftog={ftog}
           lists={lists} onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
           onSubmit={submitCall} onCancel={() => setView("log")}
         />
