@@ -30,7 +30,7 @@ function ControllerNoteBox({ sc, patchField, notify }) {
 }
 
 // Editable / read-only metadata row.
-function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, multi, bool, arrayWrap, sc, patchField, notify, isCompleted, editing: extEditing }) {
+function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, multi, bool, sc, patchField, notify, isCompleted, editing: extEditing }) {
   const C = useC();
   const controlled = extEditing !== undefined;
   const [editing, setEditing] = useState(false);
@@ -38,7 +38,6 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
   useEffect(() => setVal(sc[fieldKey] || ""), [sc[fieldKey]]);
   const save = () => { patchField(sc.id, fieldKey, val); setEditing(false); notify("Saved", C.accent); };
   const liveSet = (v) => { setVal(v); patchField(sc.id, fieldKey, v); };
-  const liveSetWrapped = (v) => { setVal(v); patchField(sc.id, fieldKey, v ? [v] : []); };
 
   const arr = Array.isArray(sc[fieldKey]) ? sc[fieldKey] : (sc[fieldKey] ? [sc[fieldKey]] : []);
   const toggleMulti = (item) => { const next = arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item]; patchField(sc.id, fieldKey, next); };
@@ -63,7 +62,7 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
               : multi
                 ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>{(options || []).map((o) => <Chip key={o} active={arr.includes(o)} onClick={() => toggleMulti(o)}>{arr.includes(o) ? "✓ " : ""}{o}</Chip>)}</div>
                 : options
-                  ? <select aria-label={label} value={arrayWrap ? (Array.isArray(sc[fieldKey]) ? sc[fieldKey][0] || "" : sc[fieldKey] || "") : val} onChange={(e) => (arrayWrap ? liveSetWrapped : liveSet)(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
+                  ? <select aria-label={label} value={val} onChange={(e) => liveSet(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
                   : <input aria-label={label} type={type} value={type === "date" ? fmtDate(val) : type === "time" ? fmtTime(val) : val} onChange={(e) => liveSet(e.target.value)} style={{ ...inp(C, true), flex: 1, width: "auto" }} />)
           : <span style={{ flex: 1, fontSize: 13, color: (bool || multi || val) ? C.text : C.muted }}>{bool ? boolDisplay : multi ? multiDisplay : (fmt ? fmt(val) : val || "—")}</span>}
       </div>
@@ -181,7 +180,7 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         </CollapsibleSection>
       )}
       <CollapsibleSection title="Crew & vehicle" locked={locked}>
-        <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" options={riderNames} fmt={(v) => Array.isArray(v) ? v.join(", ") : v || "—"} arrayWrap />
+        <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" multi options={riderNames} />
         <EditRow {...rowCtx} label="Duty status" fieldKey="riderDutyStatus" options={dutyStatuses} />
         <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicleList} />
         <EditRow {...rowCtx} label="Meet other group" fieldKey="meetOtherGroup" multi options={meetups} />

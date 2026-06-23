@@ -10,6 +10,7 @@ import NewCallForm from "./views/NewCallForm.jsx";
 import CallDetail from "./views/CallDetail.jsx";
 import RiderList from "./views/RiderList.jsx";
 import RiderDetail from "./components/RiderDetail.jsx";
+import InstallPrompt from "./components/InstallPrompt.jsx";
 
 const NavBtn = ({ v, children, view, setView, C }) => (
   <button onClick={() => setView(v)}
@@ -203,6 +204,8 @@ export default function MainApp({ session, onLogout }) {
       `}</style>
 
       {toast && <div role="alert" style={{ position: "fixed", top: 16, right: 16, background: toast.color, color: "#fff", padding: "10px 20px", borderRadius: 7, fontSize: 13, zIndex: 9999, boxShadow: "0 4px 24px rgba(0,0,0,0.3)", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "pre-line", maxWidth: 300, lineHeight: 1.6 }}>{toast.msg}</div>}
+
+      <InstallPrompt />
 
       {/* Header */}
       <header className="bbw-header" role="banner" style={{ background: C.panel, borderBottom: `1px solid ${C.border}` }}>

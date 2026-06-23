@@ -1,7 +1,7 @@
 {
   "name": "Blood Bike West Control Centre",
   "short_name": "BBW Control",
-  "description": "Blood Bike West dispatcher and rider control centre",
+  "description": "Blood Bike West controller and rider control centre",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#090910",
