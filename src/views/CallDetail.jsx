@@ -121,6 +121,8 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
   const locked = isCompleted || readOnly; // no editing affordances when locked
   const hospitals = lists.hospitals || [];
   const riderNames = (lists.riders || []).map((r) => String(r.name || r));
+  const rider1 = Array.isArray(sc.riders) ? (sc.riders[0] || "") : (sc.riders || "");
+  const rider2Options = riderNames.filter((n) => n !== rider1);
   const itemPicklist = lists.itemPicklist || [];
   const dutyStatuses = lists.dutyStatuses || [];
   const meetups = lists.meetups || [];
@@ -183,6 +185,8 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" multi options={riderNames} />
         <EditRow {...rowCtx} label="Duty status" fieldKey="riderDutyStatus" options={dutyStatuses} />
         <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicleList} />
+        <EditRow {...rowCtx} label="Second rider" fieldKey="rider2" options={rider2Options} />
+        <EditRow {...rowCtx} label="Rider 2 meet-up time" fieldKey="rider2MeetupTime" type="time" fmt={fmtTime} />
         <EditRow {...rowCtx} label="Meet other group" fieldKey="meetOtherGroup" multi options={meetups} />
         <EditRow {...rowCtx} label="Meet-up date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate} />
         <EditRow {...rowCtx} label="Meet-up time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />

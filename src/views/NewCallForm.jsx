@@ -105,12 +105,24 @@ export default function NewCallForm({
           </div>
           <div><Label required filled={!!form.riderDutyStatus}>Rider duty status</Label><select aria-label="Rider duty status" value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%", ...reqFrame }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
           <div><Label required filled={!!form.vehicleUsed}>Vehicle used</Label><select aria-label="Vehicle used" value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%", ...reqFrame }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
+          {!(Array.isArray(form.meetOtherGroup) && form.meetOtherGroup.length > 0) && (
+            <div><Label optional>Second rider</Label>
+              <select aria-label="Second rider" value={form.rider2 || ""} onChange={(e) => { const v = e.target.value; if (v) fset("rider2", v); else { fset("rider2", ""); fset("rider2MeetupTime", ""); } }} style={{ ...sel(C), width: "100%" }}>
+                <option value="">No Second Rider</option>
+                {riders.filter((r) => String(r.name || r) !== (form.riders[0] || "")).map((r, i) => <option key={i}>{String(r.name || r)}</option>)}
+              </select>
+            </div>
+          )}
+          {!!form.rider2 && (
+            <div><Label optional>Meetup with Rider 2 — Time</Label><input type="time" aria-label="Meetup with Rider 2 time" value={form.rider2MeetupTime} onChange={(e) => fset("rider2MeetupTime", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>
+          )}
           <div>
             <Label>Green lights authorised</Label>
             <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
               {[true, false].map((val) => <button key={String(val)} onClick={() => fset("greenLights", val)} style={{ padding: "8px 24px", borderRadius: 7, border: `1px solid ${form.greenLights === val ? (val ? C.green : C.red) : C.borderHi}`, background: form.greenLights === val ? (val ? C.green + "22" : C.red + "22") : C.card, color: form.greenLights === val ? (val ? C.green : C.red) : C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", fontWeight: 700 }}>{val ? "✓  YES" : "✕  NO"}</button>)}
             </div>
           </div>
+          {!form.rider2 && (
           <div>
             <Label optional>Meet with other group</Label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginTop: 4 }}>
@@ -127,6 +139,7 @@ export default function NewCallForm({
               <button onClick={addGroup} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
             </div>
           </div>
+          )}
           {Array.isArray(form.meetOtherGroup) && form.meetOtherGroup.length > 0 && (
             <Grid cols={2}>
               <div><Label optional>Scheduled meet-up date</Label><input type="date" aria-label="Scheduled meet-up date" value={form.scheduledMeetupDate} onChange={(e) => fset("scheduledMeetupDate", e.target.value)} style={{ ...inp(C), width: "100%" }} /></div>

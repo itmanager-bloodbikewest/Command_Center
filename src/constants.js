@@ -8,6 +8,7 @@ export const EMPTY_CALL = {
   greenLights:false, meetOtherGroup:[], vehicleUsed:"", riderCalled:"", notes:"",
   contactName:"", contactPhone:"", pickupAddress:"", dropOffAddress:"",
   scheduledMeetupDate:"", scheduledMeetupTime:"",
+  rider2:"", rider2MeetupTime:"",
   pickupTime:"", meetupTime:"", deliveryTime:"", riderHome:"", completedAt:"",
   overrides:{}, status:"pending-pickup", id:"",
 };
