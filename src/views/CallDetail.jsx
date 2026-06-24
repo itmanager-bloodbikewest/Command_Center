@@ -30,18 +30,20 @@ function ControllerNoteBox({ sc, patchField, notify }) {
 }
 
 // Editable / read-only metadata row.
-function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, multi, bool, sc, patchField, notify, isCompleted, editing: extEditing }) {
+function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = false, fmt, options, multi, bool, arrayWrap, onChanged, sc, patchField, notify, isCompleted, editing: extEditing }) {
   const C = useC();
   const controlled = extEditing !== undefined;
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(sc[fieldKey] || "");
   useEffect(() => setVal(sc[fieldKey] || ""), [sc[fieldKey]]);
   const save = () => { patchField(sc.id, fieldKey, val); setEditing(false); notify("Saved", C.accent); };
-  const liveSet = (v) => { setVal(v); patchField(sc.id, fieldKey, v); };
+  const liveSet = (v) => { setVal(v); patchField(sc.id, fieldKey, v); onChanged && onChanged(v); };
+  const liveSetWrapped = (v) => { setVal(v); patchField(sc.id, fieldKey, v ? [v] : []); onChanged && onChanged(v); };
 
   const arr = Array.isArray(sc[fieldKey]) ? sc[fieldKey] : (sc[fieldKey] ? [sc[fieldKey]] : []);
-  const toggleMulti = (item) => { const next = arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item]; patchField(sc.id, fieldKey, next); };
+  const toggleMulti = (item) => { const next = arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item]; patchField(sc.id, fieldKey, next); onChanged && onChanged(next); };
   const multiDisplay = arr.length ? arr.join(", ") : "—";
+  const wrappedVal = arrayWrap ? (Array.isArray(sc[fieldKey]) ? sc[fieldKey][0] || "" : sc[fieldKey] || "") : val;
   const boolDisplay = <span style={{ color: sc[fieldKey] === true ? C.green : sc[fieldKey] === false ? C.red : C.muted }}>{sc[fieldKey] === true ? "✓ YES" : sc[fieldKey] === false ? "✕ NO" : "—"}</span>;
 
   if (children || ro)
@@ -62,9 +64,9 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
               : multi
                 ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>{(options || []).map((o) => <Chip key={o} active={arr.includes(o)} onClick={() => toggleMulti(o)}>{arr.includes(o) ? "✓ " : ""}{o}</Chip>)}</div>
                 : options
-                  ? <select aria-label={label} value={val} onChange={(e) => liveSet(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
+                  ? <select aria-label={label} value={arrayWrap ? wrappedVal : val} onChange={(e) => (arrayWrap ? liveSetWrapped : liveSet)(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto" }}><option value="">— Select —</option>{options.map((o) => <option key={o}>{o}</option>)}</select>
                   : <input aria-label={label} type={type} value={type === "date" ? fmtDate(val) : type === "time" ? fmtTime(val) : val} onChange={(e) => liveSet(e.target.value)} style={{ ...inp(C, true), flex: 1, width: "auto" }} />)
-          : <span style={{ flex: 1, fontSize: 13, color: (bool || multi || val) ? C.text : C.muted }}>{bool ? boolDisplay : multi ? multiDisplay : (fmt ? fmt(val) : val || "—")}</span>}
+          : <span style={{ flex: 1, fontSize: 13, color: (bool || multi || val || wrappedVal) ? C.text : C.muted }}>{bool ? boolDisplay : multi ? multiDisplay : arrayWrap ? (wrappedVal || "—") : (fmt ? fmt(val) : val || "—")}</span>}
       </div>
     );
 
@@ -123,6 +125,8 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
   const riderNames = (lists.riders || []).map((r) => String(r.name || r));
   const rider1 = Array.isArray(sc.riders) ? (sc.riders[0] || "") : (sc.riders || "");
   const rider2Options = riderNames.filter((n) => n !== rider1);
+  const hasRider2 = !!sc.rider2;
+  const hasGroup = Array.isArray(sc.meetOtherGroup) ? sc.meetOtherGroup.length > 0 : !!sc.meetOtherGroup;
   const itemPicklist = lists.itemPicklist || [];
   const dutyStatuses = lists.dutyStatuses || [];
   const meetups = lists.meetups || [];
@@ -182,14 +186,14 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         </CollapsibleSection>
       )}
       <CollapsibleSection title="Crew & vehicle" locked={locked}>
-        <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" multi options={riderNames} />
+        <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" options={riderNames} arrayWrap />
         <EditRow {...rowCtx} label="Duty status" fieldKey="riderDutyStatus" options={dutyStatuses} />
         <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicleList} />
-        <EditRow {...rowCtx} label="Second rider" fieldKey="rider2" options={rider2Options} />
-        <EditRow {...rowCtx} label="Rider 2 meet-up time" fieldKey="rider2MeetupTime" type="time" fmt={fmtTime} />
-        <EditRow {...rowCtx} label="Meet other group" fieldKey="meetOtherGroup" multi options={meetups} />
-        <EditRow {...rowCtx} label="Meet-up date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate} />
-        <EditRow {...rowCtx} label="Meet-up time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />
+        {!hasGroup && <EditRow {...rowCtx} label="Second rider" fieldKey="rider2" options={rider2Options} onChanged={(v) => { if (v) patchField(sc.id, "meetOtherGroup", []); else patchField(sc.id, "rider2MeetupTime", ""); }} />}
+        {!hasGroup && sc.rider2 && <EditRow {...rowCtx} label="Rider 2 meet-up time" fieldKey="rider2MeetupTime" type="time" fmt={fmtTime} />}
+        {!hasRider2 && <EditRow {...rowCtx} label="Meet other group" fieldKey="meetOtherGroup" multi options={meetups} onChanged={(arr) => { if (arr.length) { patchField(sc.id, "rider2", ""); patchField(sc.id, "rider2MeetupTime", ""); } }} />}
+        {!hasRider2 && hasGroup && <EditRow {...rowCtx} label="Meet-up date" fieldKey="scheduledMeetupDate" type="date" fmt={fmtDate} />}
+        {!hasRider2 && hasGroup && <EditRow {...rowCtx} label="Meet-up time" fieldKey="scheduledMeetupTime" type="time" fmt={fmtTime} />}
         <EditRow {...rowCtx} label="Green lights" fieldKey="greenLights" bool />
       </CollapsibleSection>
       <CollapsibleSection title="Notes" locked={locked}>

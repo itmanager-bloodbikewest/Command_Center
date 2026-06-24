@@ -66,6 +66,8 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
   const canPickup = c.status === "pending-pickup";
   const canDropoff = c.status === "in-transit";
   const canHome = c.status === "delivered";
+  const sc_hasRider2 = !!c.rider2;
+  const sc_hasGroup = Array.isArray(c.meetOtherGroup) ? c.meetOtherGroup.length > 0 : !!c.meetOtherGroup;
 
   // On mobile with a controller number, prompt for channel; otherwise write
   // the status straight through (desktop, or no number to message).
@@ -123,13 +125,18 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
           <InfoRow C={C} label="Controller" value={c.controllerName || null} />
           <InfoRow C={C} label="Controller phone" value={c.controllerPhone ? <a href={`tel:${c.controllerPhone}`} style={{ color: C.accentText, textDecoration: "none" }}>{c.controllerPhone}</a> : null} />
         </Section>
-        {((Array.isArray(c.meetOtherGroup) ? c.meetOtherGroup.length > 0 : c.meetOtherGroup) || c.scheduledMeetupDate || c.scheduledMeetupTime) && (
+        {sc_hasRider2 ? (
+          <Section title="Second rider">
+            <InfoRow C={C} label="Second rider" value={c.rider2 || null} />
+            <InfoRow C={C} label="Rider 2 meet-up time" value={c.rider2MeetupTime ? fmtTime(c.rider2MeetupTime) : null} />
+          </Section>
+        ) : sc_hasGroup ? (
           <Section title="Meet-up">
             <InfoRow C={C} label="Meet with" value={Array.isArray(c.meetOtherGroup) ? c.meetOtherGroup.join(", ") || null : c.meetOtherGroup || null} />
             <InfoRow C={C} label="Scheduled meet-up date" value={c.scheduledMeetupDate ? fmtDate(c.scheduledMeetupDate) : null} />
             <InfoRow C={C} label="Scheduled meet-up time" value={c.scheduledMeetupTime ? fmtTime(c.scheduledMeetupTime) : null} />
           </Section>
-        )}
+        ) : null}
         {(c.contactName || c.contactPhone) && (
           <Section title="Contact">
             <InfoRow C={C} label="Contact name" value={c.contactName || null} />

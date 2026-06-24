@@ -14,11 +14,17 @@ export const nowDate = () =>
 export const nowDT = () => `${nowDate()} ${nowTime()}`;
 
 export const fmtTime = (v) => {
-  if (!v) return "—";
-  const s = String(v);
-  if (/^\d{2}:\d{2}$/.test(s)) return s;
-  if (s.includes("T")) { const d = new Date(s); if (!isNaN(d)) return d.toLocaleTimeString("en-IE", timeOpts); }
-  if (s.startsWith("1899-12-30") || s.startsWith("1899-12-31")) { const d = new Date(s); if (!isNaN(d)) return d.toLocaleTimeString("en-IE", timeOpts); }
+  if (v === null || v === undefined) return "—";
+  const s = String(v).trim();
+  if (!s) return "—";
+  if (/^\d{1,2}:\d{2}$/.test(s)) return s.length === 4 ? "0" + s : s;            // H:MM / HH:MM
+  if (s.includes("T")) {                                                          // ISO / sheet time-serial
+    const t = s.split("T")[1] || "";
+    const m = t.match(/^(\d{2}):(\d{2})/);
+    if (m) return `${m[1]}:${m[2]}`;                                              // take clock time literally
+  }
+  const d = new Date(s);
+  if (!isNaN(d)) return d.toLocaleTimeString("en-IE", timeOpts);
   return s.slice(0, 5);
 };
 
