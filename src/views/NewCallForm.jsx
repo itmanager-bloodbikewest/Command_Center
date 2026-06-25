@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
 import { Section, Grid, Label, Chip, HomeButton, inp, sel } from "../ui/primitives.jsx";
 import { fmtDate, fmtTime } from "../lib/datetime.js";
@@ -62,10 +62,31 @@ export default function NewCallForm({
   const autoBg = "transparent";                            // auto-captured -> neutral (AUTO chip carries meaning)
   const isOtherNotes = (item) => { const l = String(item).toLowerCase(); return l.includes("other") && l.includes("note"); };
 
-  const go = (d) => {
-    setPage((p) => Math.max(0, Math.min(3, p + d)));
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-  };
+  const go = (d) => setPage((p) => Math.max(0, Math.min(3, p + d)));
+
+  // Reset to the top when the step changes. The actual scroll container varies
+  // by viewport (sometimes this div, sometimes the document), so walk up from
+  // the form node and reset whichever ancestors are scrolled, then re-run on the
+  // next frame once the new page's height has settled.
+  useEffect(() => {
+    const reset = () => {
+      let el = scrollRef.current;
+      while (el) {
+        if (el.scrollTop > 0) el.scrollTop = 0;
+        el = el.parentElement;
+      }
+      if (typeof window !== "undefined") window.scrollTo(0, 0);
+      const d = typeof document !== "undefined" ? document : null;
+      if (d) {
+        if (d.scrollingElement) d.scrollingElement.scrollTop = 0;
+        if (d.documentElement) d.documentElement.scrollTop = 0;
+        if (d.body) d.body.scrollTop = 0;
+      }
+    };
+    reset();
+    const id = requestAnimationFrame(reset);
+    return () => cancelAnimationFrame(id);
+  }, [page]);
 
   // "Other (Add to Notes)" notes popup (replaces former scroll-to-focus behaviour)
   const [notesModalOpen, setNotesModalOpen] = useState(false);
@@ -215,9 +236,9 @@ export default function NewCallForm({
                   }}>{active ? "✓ " : ""}{g}</Chip>;
                 })}
               </div>
-              <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                <input aria-label="Add a new group" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addGroup())} placeholder="Add a new group…" style={{ ...inp(C), flex: 1, width: "auto" }} />
-                <button onClick={addGroup} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
+              <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                <input aria-label="Add a new group" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addGroup())} placeholder="Add a new group…" style={{ ...inp(C), flex: "1 1 180px", width: "auto", minWidth: 0 }} />
+                <button onClick={addGroup} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "10px 18px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "nowrap" }}>ADD</button>
               </div>
             </div>
             )}

@@ -33,12 +33,12 @@ export default function LocationField({ label, value, onChange, options, exclude
     <div>
       <Label required={required} filled={filled}>{label}</Label>
       {!adding ? (
-        <div style={{ display: "flex", gap: 6 }}>
-          <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} style={{ ...sel(C), flex: 1, width: "auto", ...frame }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} style={{ ...sel(C), flex: "1 1 180px", width: "auto", minWidth: 0, ...frame }}>
             <option value="">— Select —</option>
             {options.filter((o) => !exclude.includes(o)).map((h) => <option key={h}>{h}</option>)}
           </select>
-          <button onClick={() => setAdding(true)} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "nowrap" }}>+ ADD</button>
+          <button onClick={() => setAdding(true)} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "10px 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "nowrap" }}>+ ADD</button>
         </div>
       ) : (
         <div>
@@ -52,8 +52,8 @@ export default function LocationField({ label, value, onChange, options, exclude
             </div>
           ) : (
             <div style={{ position: "relative" }}>
-              <div style={{ display: "flex", gap: 6 }}>
-                <input aria-label={label} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAdd()} placeholder="Type location name…" autoFocus style={{ ...inp(C), flex: 1, width: "auto" }} />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <input aria-label={label} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAdd()} placeholder="Type location name…" autoFocus style={{ ...inp(C), flex: "1 1 180px", width: "auto", minWidth: 0 }} />
                 <button onClick={handleAdd} style={{ background: C.accent, border: "none", color: "#fff", borderRadius: 6, padding: "0 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>ADD</button>
                 <button aria-label="Cancel adding location" onClick={() => { setAdding(false); setQuery(""); setSuggestions([]); }} style={{ background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "0 10px", fontSize: 11, cursor: "pointer" }}>✕</button>
               </div>

@@ -70,7 +70,7 @@ export const Section = ({ title, children, style = {} }) => {
 };
 
 export const Grid = ({ cols = 2, children, gap = 14 }) => (
-  <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap }}>{children}</div>
+  <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},minmax(0,1fr))`, gap }}>{children}</div>
 );
 
 export const Chip = ({ active, children, onClick, color }) => {
