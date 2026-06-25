@@ -30,6 +30,35 @@ export const Label = ({ children, auto, optional, note, required, filled }) => {
   );
 };
 
+// Shared top-left "leave / go home" control. Icon-only, but deliberately
+// prominent: a tinted square with an accent border and a bright home glyph so
+// it reads clearly as a tappable button (replaces the old faint "← BACK" text).
+// The caller decides what happens on click (immediate nav, or a confirm).
+export const HomeButton = ({ onClick, title = "Home", style = {} }) => {
+  const C = useC();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={title}
+      title={title}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 44, height: 44, borderRadius: 11, flexShrink: 0, padding: 0, cursor: "pointer",
+        background: isDark(C) ? C.accent + "26" : C.accent + "14",
+        border: `1.5px solid ${C.accent}`, color: C.accentText,
+        boxShadow: isDark(C) ? `0 0 14px ${C.accent}33` : "none",
+        ...style,
+      }}
+    >
+      <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 10.5 12 3l9 7.5" />
+        <path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" />
+      </svg>
+    </button>
+  );
+};
+
 export const Section = ({ title, children, style = {} }) => {
   const C = useC();
   return (

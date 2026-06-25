@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useC, isDark } from "../lib/theme.jsx";
-import { Label, Section, Badge, inp } from "../ui/primitives.jsx";
+import { Label, Section, Badge, HomeButton, inp } from "../ui/primitives.jsx";
 import { fmtTime, fmtDate } from "../lib/datetime.js";
 import { isMobileUA, smsLink } from "../lib/messaging.js";
 import NotesList from "./NotesList.jsx";
@@ -95,7 +95,7 @@ export default function RiderDetail({ call: c, onBack, onPickup, onDropoff, onRi
   return (
     <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", zoom: 1.25 }}>
       <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: "14px 24px", position: "sticky", top: 0, zIndex: 2, flexShrink: 0 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: 0, marginBottom: 6 }}>← BACK</button>
+        <div style={{ marginBottom: 10 }}><HomeButton onClick={onBack} /></div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 16, color: C.accentText, fontWeight: 700 }}>{c.originHospital} → {c.destinationHospital}</div>
