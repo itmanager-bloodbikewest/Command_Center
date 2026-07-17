@@ -729,12 +729,6 @@ function MainApp({ session, onLogout }) {
                   {pendingDB.map(rc=><RunCard key={rc.id} rc={rc} color={C.accentText} onClickView={()=>{setDetailId(rc.id);setView("detail");}}/>)}
                 </>
               )}
-              {completedDB.length>0&&(
-                <>
-                  <div style={{fontSize:9,letterSpacing:3,color:C.purple,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10,marginTop:24}}>COMPLETED — {completedDB.length} RUN{completedDB.length!==1?"S":""}</div>
-                  {completedDB.map(rc=><RunCard key={rc.id} rc={rc} color={C.purple} onClickView={()=>{setDetailId(rc.id);setView("detail");}}/>)}
-                </>
-              )}
             </>
           )}
         </div>
@@ -992,12 +986,6 @@ function MainApp({ session, onLogout }) {
                   <>
                     <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {myActive.length} RUN{myActive.length!==1?"S":""}</div>
                     {myActive.map(rc=><RunCard key={rc.id} rc={rc} color={C.accentText} onClickView={()=>{setDetailId(rc.id);setView("rider-detail");}}/>)}
-                  </>
-                )}
-                {myCompleted.length>0&&(
-                  <>
-                    <div style={{fontSize:9,letterSpacing:3,color:C.purple,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10,marginTop:24}}>COMPLETED — {myCompleted.length} RUN{myCompleted.length!==1?"S":""}</div>
-                    {myCompleted.map(rc=><RunCard key={rc.id} rc={rc} color={C.purple} onClickView={()=>{setDetailId(rc.id);setView("rider-detail");}}/>)}
                   </>
                 )}
               </>
