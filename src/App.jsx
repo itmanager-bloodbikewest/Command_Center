@@ -47,19 +47,60 @@ async function api(action, payload = {}) {
 
 const normalizePhone = (p) => String(p).replace(/[\s\-\(\)\+]/g, "").trim();
 
-const SESSION_KEY = "bbw_session";
-const SESSION_TTL = 2 * 60 * 60 * 1000;
-const saveSession = (data) => localStorage.setItem(SESSION_KEY, JSON.stringify({...data, savedAt: Date.now()}));
+// Shared across the hub, Rota, and Command Centre via a cookie scoped to
+// .bloodbikewest.ie (falls back to a host-only cookie on any other origin,
+// e.g. local dev, where the shared domain wouldn't be valid).
+const SESSION_COOKIE = "bbw_session";
+
+function cookieDomain() {
+  return typeof window !== "undefined" && window.location.hostname.endsWith("bloodbikewest.ie")
+    ? ".bloodbikewest.ie"
+    : "";
+}
+function setCookie(name, value, days) {
+  const domain = cookieDomain();
+  let str = `${name}=${encodeURIComponent(value)}; path=/; max-age=${days*24*60*60}; SameSite=Lax; Secure`;
+  if (domain) str += `; domain=${domain}`;
+  document.cookie = str;
+}
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function deleteCookie(name) {
+  const domain = cookieDomain();
+  let str = `${name}=; path=/; max-age=0; SameSite=Lax; Secure`;
+  if (domain) str += `; domain=${domain}`;
+  document.cookie = str;
+}
+
+// Saves a Command Centre session inside the shared cookie. Preserves an
+// existing token (e.g. one issued by Rota's password login) if the cookie
+// already has one — a phone-only Command Centre login has no token of its
+// own to offer, and must not clobber a real one.
+const saveSession = (data) => {
+  let token = null;
+  try {
+    const existing = JSON.parse(getCookie(SESSION_COOKIE) || "null");
+    if (existing && existing.token) token = existing.token;
+  } catch { /* ignore */ }
+  const user = { name: data.name, phone: data.phone, role: data.role, controllers: data.controllers || [], riders: data.riders || [] };
+  setCookie(SESSION_COOKIE, JSON.stringify({ token, user, savedAt: Date.now() }), 30);
+};
+
+// Returns the flat shape the rest of this file expects:
+// {phone, role, name, controllers, riders}
 const loadSession = () => {
   try {
-    const s = JSON.parse(localStorage.getItem(SESSION_KEY));
-    if (!s) return null;
-    if (Date.now() - s.savedAt > SESSION_TTL) { localStorage.removeItem(SESSION_KEY); return null; }
-    const { savedAt, ...session } = s;
-    return session;
+    const raw = getCookie(SESSION_COOKIE);
+    if (!raw) return null;
+    const { user } = JSON.parse(raw);
+    if (!user || !user.name) return null;
+    return { ...user };
   } catch { return null; }
 };
-const clearSession = () => localStorage.removeItem(SESSION_KEY);
+
+const clearSession = () => deleteCookie(SESSION_COOKIE);
 
 const nowTime = () => new Date().toLocaleTimeString("en-IE",{timeZone:"Europe/Dublin",hour:"2-digit",minute:"2-digit",hour12:false});
 const nowDate = () => new Date().toLocaleDateString("en-IE",{timeZone:"Europe/Dublin"}).split("/").reverse().join("-").replace(/(\d{4})-(\d{1,2})-(\d{1,2})/,(_,y,m,d)=>`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
