@@ -8,6 +8,10 @@
 import { useState, useEffect, useCallback } from "react";
 
 const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL;
+// Rota's Apps Script deployment — Command Centre's own backend has no
+// password check, so login is delegated to Rota's `login` action, which
+// validates the shared password and issues a real session token.
+const ROTA_APPS_SCRIPT_URL = import.meta.env.VITE_ROTA_APPS_SCRIPT_URL;
 const VAPID_KEY       = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 const FIREBASE_CONFIG = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -39,6 +43,17 @@ async function api(action, payload = {}) {
   const url = new URL(APPS_SCRIPT_URL);
   url.searchParams.set("action", action);
   if (Object.keys(payload).length > 0) url.searchParams.set("data", JSON.stringify(payload));
+  const res = await fetch(url.toString(), { method: "GET", redirect: "follow" });
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch { throw new Error("Invalid response: " + text.slice(0, 100)); }
+}
+
+async function rotaLogin(phone, password) {
+  const url = new URL(ROTA_APPS_SCRIPT_URL);
+  url.searchParams.set("action", "login");
+  url.searchParams.set("phone", phone);
+  url.searchParams.set("password", password);
   const res = await fetch(url.toString(), { method: "GET", redirect: "follow" });
   const text = await res.text();
   try { return JSON.parse(text); }
@@ -78,12 +93,14 @@ function deleteCookie(name) {
 // existing token (e.g. one issued by Rota's password login) if the cookie
 // already has one — a phone-only Command Centre login has no token of its
 // own to offer, and must not clobber a real one.
-const saveSession = (data) => {
-  let token = null;
-  try {
-    const existing = JSON.parse(getCookie(SESSION_COOKIE) || "null");
-    if (existing && existing.token) token = existing.token;
-  } catch { /* ignore */ }
+const saveSession = (data, newToken) => {
+  let token = newToken || null;
+  if (!token) {
+    try {
+      const existing = JSON.parse(getCookie(SESSION_COOKIE) || "null");
+      if (existing && existing.token) token = existing.token;
+    } catch { /* ignore */ }
+  }
   const user = { name: data.name, phone: data.phone, role: data.role, controllers: data.controllers || [], riders: data.riders || [] };
   setCookie(SESSION_COOKIE, JSON.stringify({ token, user, savedAt: Date.now() }), 30);
 };
@@ -466,19 +483,26 @@ function RiderDetail({ call:c, onBack, onPickup, onDropoff, onRiderHome, onNote 
 // LOGIN SCREEN
 // =============================================================================
 function LoginScreen({ onLogin }) {
-  const [phone,   setPhone]   = useState("");
-  const [errMsg,  setErrMsg]  = useState("");
-  const [loading, setLoading] = useState(false);
+  const [phone,    setPhone]    = useState("");
+  const [password, setPassword] = useState("");
+  const [errMsg,   setErrMsg]   = useState("");
+  const [loading,  setLoading]  = useState(false);
 
   const handleLogin = async () => {
     const normalized = normalizePhone(phone);
     if (!normalized) { setErrMsg("Please enter your phone number."); return; }
+    if (!password)   { setErrMsg("Please enter the password."); return; }
     setLoading(true); setErrMsg("");
     try {
+      // Password check + token issuance is delegated to Rota's backend —
+      // this is what makes a Command Centre login also count as a Rota login.
+      const loginRes = await rotaLogin(normalized, password);
+      if (loginRes.error) { setErrMsg(loginRes.error); setLoading(false); return; }
+
       const res = await api("getUserRole", { phone: normalized });
       if (!res.found) { setErrMsg("Phone number not recognised. Please contact your administrator."); setLoading(false); return; }
       const session = { phone: normalized, role: res.role, name: res.name, controllers: res.controllers||[], riders: res.riders||[] };
-      saveSession(session);
+      saveSession(session, loginRes.token);
       onLogin(session);
       registerPushNotifications(normalized).catch(()=>{});
     } catch(e) {
@@ -496,10 +520,12 @@ function LoginScreen({ onLogin }) {
         <div style={{fontSize:10,color:C.muted,letterSpacing:4,marginTop:2}}>COMMAND CENTRE</div>
       </div>
       <div style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:32,width:"100%",maxWidth:380,boxShadow:"0 4px 24px rgba(0,0,0,0.15)"}}>
-        <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.7,textAlign:"center"}}>Enter your phone number to sign in.</div>
+        <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.7,textAlign:"center"}}>Enter your phone number and the team password to sign in.</div>
         {errMsg&&<div style={{background:C.errorBg,border:`1px solid ${C.red}`,borderRadius:7,padding:"10px 14px",marginBottom:16,fontSize:12,color:C.errorText}}>{errMsg}</div>}
         <Label>Phone Number</Label>
-        <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="e.g. 087 123 4567" style={{...inp(),width:"100%",marginBottom:14,fontSize:15}}/>
+        <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} onKeyDown={e=>e.key==="Enter"&&document.getElementById("cc-password-input")?.focus()} placeholder="e.g. 087 123 4567" style={{...inp(),width:"100%",marginBottom:14,fontSize:15}}/>
+        <Label>Password</Label>
+        <input id="cc-password-input" type="password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="Shared team password" style={{...inp(),width:"100%",marginBottom:14,fontSize:15}}/>
         <button onClick={handleLogin} disabled={loading} style={{width:"100%",background:loading?(C===THEME.dark?"#1a2a4a":"#9ab0e8"):C.accent,border:"none",color:"#fff",padding:"13px",borderRadius:8,fontSize:13,cursor:loading?"default":"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1}}>
           {loading?"CHECKING…":"SIGN IN"}
         </button>
