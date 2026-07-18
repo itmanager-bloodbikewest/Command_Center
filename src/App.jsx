@@ -90,16 +90,6 @@ const fmtDT = (v) => {
   return s;
 };
 
-// Get browser GPS position — returns {lat, lng} or null (never throws)
-const getGeoPosition = () => new Promise(resolve => {
-  if (!navigator.geolocation) { resolve(null); return; }
-  navigator.geolocation.getCurrentPosition(
-    pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-    ()  => resolve(null),
-    { timeout: 5000, maximumAge: 10000 }
-  );
-});
-
 const EMPTY_CALL = {
   timestamp:"", timeOfCall:"", dateOfCallFromHospital:"", controllerName:"",
   transportDate:"", dateCallReceived:"",
@@ -422,6 +412,37 @@ function RiderDetail({ call:c, onBack, onPickup, onDropoff, onRiderHome, onNote 
 }
 
 // =============================================================================
+// ROLE SELECTION — shown to dual users after login
+// =============================================================================
+function RoleSelectScreen({ name, onSelect, onLogout }) {
+  return (
+    <div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'IBM Plex Sans',sans-serif"}}>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+      <div style={{textAlign:"center",marginBottom:40}}>
+        <img src="/logo.png" alt="Blood Bike West" style={{width:80,marginBottom:16}}/>
+        <div style={{fontSize:20,fontWeight:700,letterSpacing:2,fontFamily:"'IBM Plex Mono',monospace",color:C.text}}>BLOOD BIKE WEST</div>
+        <div style={{fontSize:10,color:C.muted,letterSpacing:4,marginTop:2}}>COMMAND CENTRE</div>
+      </div>
+      <div style={{background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:12,padding:32,width:"100%",maxWidth:380,boxShadow:"0 4px 24px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:14,color:C.text,textAlign:"center",marginBottom:8,fontWeight:600}}>Welcome, {name}</div>
+        <div style={{fontSize:12,color:C.muted,textAlign:"center",marginBottom:28}}>How would you like to access the app today?</div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <button onClick={()=>onSelect("dispatcher")}
+            style={{background:C.accent,border:"none",color:"#fff",padding:"18px",borderRadius:10,fontSize:14,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1,boxShadow:`0 0 20px ${C.accent}44`}}>
+            🎛  ACCESS AS CONTROLLER
+          </button>
+          <button onClick={()=>onSelect("rider")}
+            style={{background:C===THEME.dark?"#1a1a2e":"#f0f0f8",border:`2px solid ${C.borderHi}`,color:C.text,padding:"18px",borderRadius:10,fontSize:14,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1}}>
+            🏍  ACCESS AS RIDER
+          </button>
+        </div>
+      </div>
+      <button onClick={onLogout} style={{marginTop:24,background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1}}>SIGN OUT</button>
+    </div>
+  );
+}
+
+// =============================================================================
 // LOGIN SCREEN
 // =============================================================================
 function LoginScreen({ onLogin }) {
@@ -488,7 +509,7 @@ function MainApp({ session, onLogout }) {
   const [completedDB, setCompletedDB] = useState([]);
   const [form, setForm]               = useState({...EMPTY_CALL});
   const [hospitals,    setHospitals]    = useState([]);
-  const [vehicles,     setVehicles]     = useState([]); // [{name, reg}]
+  const [vehicles,     setVehicles]     = useState([]);
   const [meetups,      setMeetups]      = useState([]);
   const [itemPicklist, setItems]        = useState([]);
   const [dutyStatuses, setDutyStatuses] = useState([]);
@@ -510,7 +531,7 @@ function MainApp({ session, onLogout }) {
       if(res.hospitals)    setHospitals(res.hospitals);
       if(res.items)        setItems(res.items);
       if(res.meetups)      setMeetups(res.meetups);
-      if(res.vehicles)     setVehicles(res.vehicles); // [{name,reg}]
+      if(res.vehicles)     setVehicles(res.vehicles);
       if(res.dutyStatuses) setDutyStatuses(res.dutyStatuses);
     }).catch(()=>{});
   },[]);
@@ -586,27 +607,37 @@ function MainApp({ session, onLogout }) {
     catch(e){ notify("Logged locally — sync error",C.orange); }
   };
 
-  // Milestone triggers — attempt GPS capture alongside timestamp
+  // Milestone triggers — get vehicle location from Velocity Fleet if vehicleReg present
+  const getVehicleCoords = async (id) => {
+    const call = allCalls.find(x=>x.id===id);
+    if (!call || !call.vehicleReg || String(call.vehicleReg).trim()==="") return null;
+    try {
+      const res = await api("getVehicleLocation", { reg: call.vehicleReg });
+      if (res.ok && res.lat && res.lng) return { lat: res.lat, lng: res.lng };
+    } catch(e) {}
+    return null;
+  };
+
   const triggerPickup = async id => {
     const patch = {pickupTime:nowTime(), status:"in-transit"};
-    const geo = await getGeoPosition();
-    if (geo) { patch.pickupLat = geo.lat; patch.pickupLng = geo.lng; }
+    const coords = await getVehicleCoords(id);
+    if (coords) { patch.pickupLat = coords.lat; patch.pickupLng = coords.lng; }
     patchCall(id, patch);
     notify("Pickup recorded", C.accent);
   };
 
   const triggerDropoff = async id => {
     const patch = {meetupTime:nowTime(), deliveryTime:nowTime(), status:"delivered"};
-    const geo = await getGeoPosition();
-    if (geo) { patch.dropoffLat = geo.lat; patch.dropoffLng = geo.lng; }
+    const coords = await getVehicleCoords(id);
+    if (coords) { patch.dropoffLat = coords.lat; patch.dropoffLng = coords.lng; }
     patchCall(id, patch);
     notify("Delivery recorded ✓");
   };
 
   const triggerRiderHome = async id => {
     const patch = {riderHome:nowTime()};
-    const geo = await getGeoPosition();
-    if (geo) { patch.riderHomeLat = geo.lat; patch.riderHomeLng = geo.lng; }
+    const coords = await getVehicleCoords(id);
+    if (coords) { patch.riderHomeLat = coords.lat; patch.riderHomeLng = coords.lng; }
     patchCall(id, patch);
     notify("Rider home recorded");
   };
@@ -667,7 +698,6 @@ function MainApp({ session, onLogout }) {
     </div>
   );
 
-  // Vehicle name list for dropdowns (plain strings)
   const vehicleNames = vehicles.map(v=>v.name);
 
   return (
@@ -687,16 +717,6 @@ function MainApp({ session, onLogout }) {
         </div>
         {isDispatcher&&<button onClick={initiateNewCall} style={{background:C.accent,border:"none",color:"#fff",padding:"8px 14px",borderRadius:7,fontSize:11,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,letterSpacing:1,flexShrink:0}}>+ NEW CALL</button>}
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          {role==="controller"&&(
-            <div style={{display:"flex",background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:3,gap:3}}>
-              {[["dispatcher","CTL"],["rider","RDR"]].map(([d,label])=>(
-                <button key={d} onClick={()=>{setDash(d);setView(d==="dispatcher"?"log":"rider-list");}}
-                  style={{background:dash===d?C.accent:"transparent",color:dash===d?"#fff":C.muted,border:"none",borderRadius:6,padding:"6px 10px",fontSize:10,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",letterSpacing:1,fontWeight:600}}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:11,color:C.text,maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
             <button onClick={()=>{clearSession();onLogout();}} style={{background:"none",border:"none",color:C.muted,fontSize:10,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",padding:0,letterSpacing:1}}>SIGN OUT</button>
@@ -715,20 +735,16 @@ function MainApp({ session, onLogout }) {
       {/* ── RUN LOG ── */}
       {isDispatcher&&view==="log"&&(
         <div style={{flex:1,padding:16,overflowY:"auto"}}>
-          {pendingDB.length===0&&completedDB.length===0?(
+          {pendingDB.length===0?(
             <div style={{textAlign:"center",paddingTop:80}}>
               <div style={{fontSize:48,marginBottom:12}}>📋</div>
-              <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:C.muted}}>NO RUNS LOGGED TODAY</div>
+              <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:C.muted}}>NO ACTIVE RUNS</div>
               <div style={{fontSize:12,color:C.muted,marginTop:6}}>Press <strong style={{color:C.accent}}>+ NEW CALL</strong> to begin</div>
             </div>
           ):(
             <>
-              {pendingDB.length>0&&(
-                <>
-                  <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {pendingDB.length} RUN{pendingDB.length!==1?"S":""}</div>
-                  {pendingDB.map(rc=><RunCard key={rc.id} rc={rc} color={C.accentText} onClickView={()=>{setDetailId(rc.id);setView("detail");}}/>)}
-                </>
-              )}
+              <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {pendingDB.length} RUN{pendingDB.length!==1?"S":""}</div>
+              {pendingDB.map(rc=><RunCard key={rc.id} rc={rc} color={C.accentText} onClickView={()=>{setDetailId(rc.id);setView("detail");}}/>)}
             </>
           )}
         </div>
@@ -972,22 +988,17 @@ function MainApp({ session, onLogout }) {
           return assigned.length===0||assigned.some(r=>r.trim()===name.trim());
         };
         const myActive=pendingDB.filter(isMyRun);
-        const myCompleted=completedDB.filter(isMyRun);
         return (
           <div style={{flex:1,padding:16,overflowY:"auto"}}>
-            {myActive.length===0&&myCompleted.length===0?(
+            {myActive.length===0?(
               <div style={{textAlign:"center",paddingTop:80}}>
                 <div style={{fontSize:48,marginBottom:10}}>🏍</div>
                 <div style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:12,letterSpacing:2,color:C.muted}}>NO ACTIVE RUNS</div>
               </div>
             ):(
               <>
-                {myActive.length>0&&(
-                  <>
-                    <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {myActive.length} RUN{myActive.length!==1?"S":""}</div>
-                    {myActive.map(rc=><RunCard key={rc.id} rc={rc} color={C.accentText} onClickView={()=>{setDetailId(rc.id);setView("rider-detail");}}/>)}
-                  </>
-                )}
+                <div style={{fontSize:9,letterSpacing:3,color:C.orange,fontFamily:"'IBM Plex Mono',monospace",marginBottom:10}}>ACTIVE — {myActive.length} RUN{myActive.length!==1?"S":""}</div>
+                {myActive.map(rc=><RunCard key={rc.id} rc={rc} color={C.accentText} onClickView={()=>{setDetailId(rc.id);setView("rider-detail");}}/>)}
               </>
             )}
           </div>
@@ -1021,6 +1032,7 @@ export default function App() {
 
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [selectedRole, setSelectedRole] = useState(null);
 
   useEffect(()=>{
     try {
@@ -1045,5 +1057,22 @@ export default function App() {
   );
 
   if (!session) return <LoginScreen onLogin={setSession}/>;
-  return <MainApp session={session} onLogout={()=>setSession(null)}/>;
+
+  // Dual users must choose their role each session
+  if (session.role === "dual user" && !selectedRole) {
+    return (
+      <RoleSelectScreen
+        name={session.name}
+        onSelect={setSelectedRole}
+        onLogout={()=>{ clearSession(); setSession(null); }}
+      />
+    );
+  }
+
+  // Determine effective role: dual users use their selection, others use their assigned role
+  const effectiveSession = session.role === "dual user"
+    ? { ...session, role: selectedRole === "dispatcher" ? "controller" : "rider" }
+    : session;
+
+  return <MainApp session={effectiveSession} onLogout={()=>{ clearSession(); setSession(null); setSelectedRole(null); }}/>;
 }
