@@ -48,7 +48,7 @@ async function api(action, payload = {}) {
 const normalizePhone = (p) => String(p).replace(/[\s\-\(\)\+]/g, "").trim();
 
 const SESSION_KEY = "bbw_session";
-const SESSION_TTL = 2 * 60 * 60 * 1000;
+const SESSION_TTL = Infinity;
 const saveSession = (data) => localStorage.setItem(SESSION_KEY, JSON.stringify({...data, savedAt: Date.now()}));
 const loadSession = () => {
   try {
