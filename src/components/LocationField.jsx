@@ -3,7 +3,7 @@ import { useC, isDark, THEME } from "../lib/theme.jsx";
 import { Label, inp, sel } from "../ui/primitives.jsx";
 import SuggestionDropdown from "./SuggestionDropdown.jsx";
 
-export default function LocationField({ label, value, onChange, options, exclude = [], onAdd, bg, required, filled }) {
+export default function LocationField({ label, value, onChange, options, exclude = [], onAdd, bg, required, filled, addLabel = "+ ADD" }) {
   const C = useC();
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
