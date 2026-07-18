@@ -206,7 +206,7 @@ export default function NewCallForm({
               </select>
             </div>
             <div><Label required filled={!!form.riderDutyStatus}>Rider duty status</Label><select aria-label="Rider duty status" value={form.riderDutyStatus} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={{ ...sel(C), width: "100%", ...reqFrame }}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select></div>
-            <div><Label required filled={!!form.vehicleUsed}>Vehicle used</Label><select aria-label="Vehicle used" value={form.vehicleUsed} onChange={(e) => fset("vehicleUsed", e.target.value)} style={{ ...sel(C), width: "100%", ...reqFrame }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
+            <div><Label required filled={!!form.vehicleUsed}>Vehicle used</Label><select aria-label="Vehicle used" value={form.vehicleUsed} onChange={(e) => { const sn = e.target.value; const m = lists.vehicleObjects?.find(x => x.name === sn); fset("vehicleUsed", sn); fset("vehicleReg", m ? m.reg : ""); }} style={{ ...sel(C), width: "100%", ...reqFrame }}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select></div>
             {!(Array.isArray(form.meetOtherGroup) && form.meetOtherGroup.length > 0) && (
               <div><Label optional>Second rider</Label>
                 <select aria-label="Second rider" value={form.rider2 || ""} onChange={(e) => { const v = e.target.value; if (v) fset("rider2", v); else { fset("rider2", ""); fset("rider2MeetupTime", ""); } }} style={{ ...sel(C), width: "100%" }}>
@@ -302,7 +302,7 @@ export default function NewCallForm({
             <SummaryRow C={C} label="Rider duty status" display={form.riderDutyStatus}
               editor={<select aria-label="Rider duty status" value={form.riderDutyStatus || ""} onChange={(e) => fset("riderDutyStatus", e.target.value)} style={editSel}><option value="">— Select —</option>{dutyStatuses.map((s) => <option key={s}>{s}</option>)}</select>} />
             <SummaryRow C={C} label="Vehicle used" display={form.vehicleUsed}
-              editor={<select aria-label="Vehicle used" value={form.vehicleUsed || ""} onChange={(e) => fset("vehicleUsed", e.target.value)} style={editSel}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select>} />
+              editor={<select aria-label="Vehicle used" value={form.vehicleUsed || ""} onChange={(e) => { const sn = e.target.value; const m = lists.vehicleObjects?.find(x => x.name === sn); fset("vehicleUsed", sn); fset("vehicleReg", m ? m.reg : ""); }} style={editSel}><option value="">— Select Vehicle —</option>{vehicles.map((v) => <option key={v}>{v}</option>)}</select>} />
             <SummaryRow C={C} label="Second rider" display={form.rider2}
               editor={<select aria-label="Second rider" value={form.rider2 || ""} onChange={(e) => setRider2(e.target.value)} style={editSel}><option value="">No Second Rider</option>{rider2Options.map((n, i) => <option key={i}>{n}</option>)}</select>} />
             <SummaryRow C={C} label="Rider 2 meet-up time" display={form.rider2MeetupTime ? fmtTime(form.rider2MeetupTime) : ""}

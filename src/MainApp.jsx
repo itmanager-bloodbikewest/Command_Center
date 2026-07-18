@@ -289,7 +289,7 @@ export default function MainApp({ session, onLogout }) {
       {isControl && view === "newcall" && (
         <NewCallForm
           form={form} fset={fset} ftog={ftog}
-          lists={{ ...lists, vehicles: vehicleNames }}
+          lists={{ ...lists, vehicles: vehicleNames, vehicleObjects: vehicles }}
           onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
           onSubmit={submitCall} onCancel={() => setView("log")}
         />
