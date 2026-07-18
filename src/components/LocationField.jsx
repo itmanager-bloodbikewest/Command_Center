@@ -38,7 +38,7 @@ export default function LocationField({ label, value, onChange, options, exclude
             <option value="">— Select —</option>
             {options.filter((o) => !exclude.includes(o)).map((h) => <option key={h}>{h}</option>)}
           </select>
-          <button onClick={() => setAdding(true)} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "10px 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "nowrap" }}>+ ADD</button>
+          <button onClick={() => setAdding(true)} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, borderRadius: 6, padding: "10px 14px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "nowrap" }}>{addLabel}</button>
         </div>
       ) : (
         <div>
