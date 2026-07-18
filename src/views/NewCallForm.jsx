@@ -181,8 +181,8 @@ export default function NewCallForm({
 
           <Section title="Route">
             <Grid cols={1}>
-              <LocationField label="Origin" required filled={!!form.originHospital} value={form.originHospital} onChange={(v) => fset("originHospital", v)} options={hospitals} exclude={[form.destinationHospital]} onAdd={onAddLocation} />
-              <LocationField label="Destination" required filled={!!form.destinationHospital} value={form.destinationHospital} onChange={(v) => fset("destinationHospital", v)} options={hospitals} exclude={[form.originHospital]} onAdd={onAddLocation} />
+              <LocationField label="Origin" required filled={!!form.originHospital} value={form.originHospital} onChange={(v) => fset("originHospital", v)} options={hospitals} exclude={[form.destinationHospital]} onAdd={onAddLocation} addLabel="NEW ORIG" />
+              <LocationField label="Destination" required filled={!!form.destinationHospital} value={form.destinationHospital} onChange={(v) => fset("destinationHospital", v)} options={hospitals} exclude={[form.originHospital]} onAdd={onAddLocation} addLabel="NEW DEST" />
             </Grid>
           </Section>
 
