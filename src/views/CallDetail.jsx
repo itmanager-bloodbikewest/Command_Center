@@ -2,6 +2,7 @@ import { useState, useEffect, Children, cloneElement, isValidElement } from "rea
 import { useC, isDark } from "../lib/theme.jsx";
 import { Section, Badge, Chip, HomeButton, inp, sel } from "../ui/primitives.jsx";
 import { fmtDate, fmtTime, fmtDT, nowDT } from "../lib/datetime.js";
+import { api } from "../lib/api.js";
 import NotesList from "../components/NotesList.jsx";
 
 // Lets a controller append a timestamped note to an active run.
@@ -82,7 +83,7 @@ function EditRow({ label, fieldKey, type = "text", children, readOnly: ro = fals
   );
 }
 
-// Timing value. When `editing` is set, shows a time input that saves live; otherwise shows the recorded value.
+// Timing value row — shows recorded time or "pending…"
 function TimingRow({ label, fieldKey, sc, allCalls, patchField, notify, editing }) {
   const C = useC();
   const val = allCalls.find((x) => x.id === sc.id)?.[fieldKey] || "";
@@ -96,8 +97,7 @@ function TimingRow({ label, fieldKey, sc, allCalls, patchField, notify, editing 
   );
 }
 
-// Card that collapses to title + View or edit. When open, a single Edit/Done
-// toggle drives all child rows into edit mode at once (live per-field save).
+// Collapsible card with Edit/Done toggle.
 function CollapsibleSection({ title, children, locked }) {
   const C = useC();
   const [open, setOpen] = useState(false);
@@ -117,10 +117,75 @@ function CollapsibleSection({ title, children, locked }) {
   );
 }
 
+// =============================================================================
+// LOCATION LOG — vehicle GPS coords captured at milestones + live tracker button
+// =============================================================================
+function LocationRow({ label, lat, lng }) {
+  const C = useC();
+  if (!lat || !lng) return null;
+  const url = `https://maps.google.com/?q=${lat},${lng}`;
+  return (
+    <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
+      <div style={{ width: 150, fontSize: 13, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", flexShrink: 0 }}>{label}</div>
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.accent, color: "#fff", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, textDecoration: "none" }}>
+        📍 View on map
+      </a>
+    </div>
+  );
+}
+
+function LiveLocationRow({ sc, notify }) {
+  const C = useC();
+  const [loading, setLoading] = useState(false);
+  const open = async () => {
+    setLoading(true);
+    try {
+      const res = await api("getVehicleLocation", { reg: sc.vehicleReg });
+      if (res.error) { notify("Location unavailable: " + res.error, C.red); }
+      else if (res.lat && res.lng) { window.open(`https://maps.google.com/?q=${res.lat},${res.lng}`, "_blank"); }
+      else { notify("No position data returned for this vehicle", C.orange); }
+    } catch { notify("Location fetch failed", C.red); }
+    setLoading(false);
+  };
+  return (
+    <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
+      <div style={{ width: 150, fontSize: 13, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", flexShrink: 0 }}>Live location</div>
+      <button onClick={open} disabled={loading}
+        style={{ background: loading ? C.card : C.accent, border: `1px solid ${loading ? C.borderHi : C.accent}`, color: loading ? C.muted : "#fff", borderRadius: 7, padding: "7px 14px", fontSize: 12, cursor: loading ? "default" : "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1 }}>
+        {loading ? "⟳ Fetching…" : "📍 View on map"}
+      </button>
+    </div>
+  );
+}
+
+function LocationLog({ sc, isCompleted, notify }) {
+  const C = useC();
+  const hasLive    = !isCompleted && sc.vehicleReg && String(sc.vehicleReg).trim() !== "";
+  const hasPickup  = sc.pickupLat  && sc.pickupLng;
+  const hasDropoff = sc.dropoffLat && sc.dropoffLng;
+  const hasHome    = sc.riderHomeLat && sc.riderHomeLng;
+
+  if (!hasLive && !hasPickup && !hasDropoff && !hasHome) return null;
+
+  return (
+    <div style={{ background: C.sectionBg, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", marginBottom: 14 }}>Location log</div>
+      {hasLive    && <LiveLocationRow sc={sc} notify={notify} />}
+      {hasPickup  && <LocationRow label="Pickup"     lat={sc.pickupLat}    lng={sc.pickupLng} />}
+      {hasDropoff && <LocationRow label="Drop-off"   lat={sc.dropoffLat}   lng={sc.dropoffLng} />}
+      {hasHome    && <LocationRow label="Rider home" lat={sc.riderHomeLat} lng={sc.riderHomeLng} />}
+    </div>
+  );
+}
+
+// =============================================================================
+// MAIN EXPORT
+// =============================================================================
 export default function CallDetail({ sc, allCalls, patchField, notify, vehicles = [], lists = {}, confirmComplete, setConfirmComplete, markComplete, onTryComplete, onBack, readOnly = false }) {
   const C = useC();
   const isCompleted = sc.status === "complete";
-  const locked = isCompleted || readOnly; // no editing affordances when locked
+  const locked = isCompleted || readOnly;
   const hospitals = lists.hospitals || [];
   const riderNames = (lists.riders || []).map((r) => String(r.name || r));
   const rider1 = Array.isArray(sc.riders) ? (sc.riders[0] || "") : (sc.riders || "");
@@ -149,6 +214,8 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
           : <div style={{ background: C.confirmBg, border: `1px solid ${C.purple}`, borderRadius: 10, padding: "14px 18px", textAlign: "center", minWidth: 200 }}><div style={{ fontSize: 13, color: C.text, marginBottom: 12, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", fontWeight: 700 }}>Mark Complete</div><div style={{ display: "flex", gap: 8 }}><button onClick={() => markComplete(sc.id)} style={{ flex: 1, background: C.purple, border: "none", color: "#fff", padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>CONFIRM</button><button onClick={() => setConfirmComplete(false)} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "8px", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button></div></div>
         )}
       </div>
+
+      {/* Timing log — pinned at top, always visible */}
       <div style={{ background: C.sectionBg, border: `1px solid ${C.borderHi}`, borderRadius: 10, padding: "18px 20px", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.text, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>Timing log</div>
@@ -162,6 +229,11 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
         <TimingRow {...timeCtx} editing={timingEdit} label="Rider home" fieldKey="riderHome" />
         {isCompleted && <TimingRow {...timeCtx} label="Completed at" fieldKey="completedAt" />}
       </div>
+
+      {/* Location log — shown when any GPS data is available */}
+      <LocationLog sc={sc} isCompleted={isCompleted} notify={notify} />
+
+      {/* Collapsible detail sections */}
       <CollapsibleSection title="Call date and time" locked={locked}>
         <EditRow {...rowCtx} label="Timestamp" readOnly><span>{fmtDT(sc.timestamp)}</span></EditRow>
         <EditRow {...rowCtx} label="Time of call" fieldKey="timeOfCall" type="time" fmt={fmtTime} />
@@ -179,16 +251,16 @@ export default function CallDetail({ sc, allCalls, patchField, notify, vehicles 
       </CollapsibleSection>
       {(sc.contactName || sc.contactPhone || sc.pickupAddress || sc.dropOffAddress) && (
         <CollapsibleSection title="Contact" locked={locked}>
-          {sc.contactName && <EditRow {...rowCtx} label="Contact name" fieldKey="contactName" />}
-          {sc.contactPhone && <EditRow {...rowCtx} label="Contact phone" fieldKey="contactPhone" type="tel" />}
-          {sc.pickupAddress && <EditRow {...rowCtx} label="Pick-up address" fieldKey="pickupAddress" />}
+          {sc.contactName    && <EditRow {...rowCtx} label="Contact name"     fieldKey="contactName" />}
+          {sc.contactPhone   && <EditRow {...rowCtx} label="Contact phone"    fieldKey="contactPhone" type="tel" />}
+          {sc.pickupAddress  && <EditRow {...rowCtx} label="Pick-up address"  fieldKey="pickupAddress" />}
           {sc.dropOffAddress && <EditRow {...rowCtx} label="Drop-off address" fieldKey="dropOffAddress" />}
         </CollapsibleSection>
       )}
       <CollapsibleSection title="Crew & vehicle" locked={locked}>
-        <EditRow {...rowCtx} label="Rider(s)" fieldKey="riders" options={riderNames} arrayWrap />
-        <EditRow {...rowCtx} label="Duty status" fieldKey="riderDutyStatus" options={dutyStatuses} />
-        <EditRow {...rowCtx} label="Vehicle" fieldKey="vehicleUsed" options={vehicleList} />
+        <EditRow {...rowCtx} label="Rider(s)"     fieldKey="riders"         options={riderNames}   arrayWrap />
+        <EditRow {...rowCtx} label="Duty status"  fieldKey="riderDutyStatus" options={dutyStatuses} />
+        <EditRow {...rowCtx} label="Vehicle"      fieldKey="vehicleUsed"    options={vehicleList}  />
         {!hasGroup && <EditRow {...rowCtx} label="Second rider" fieldKey="rider2" options={rider2Options} onChanged={(v) => { if (v) patchField(sc.id, "meetOtherGroup", []); else patchField(sc.id, "rider2MeetupTime", ""); }} />}
         {!hasGroup && sc.rider2 && <EditRow {...rowCtx} label="Rider 2 meet-up time" fieldKey="rider2MeetupTime" type="time" fmt={fmtTime} />}
         {!hasRider2 && <EditRow {...rowCtx} label="Meet other group" fieldKey="meetOtherGroup" multi options={meetups} onChanged={(arr) => { if (arr.length) { patchField(sc.id, "rider2", ""); patchField(sc.id, "rider2MeetupTime", ""); } }} />}

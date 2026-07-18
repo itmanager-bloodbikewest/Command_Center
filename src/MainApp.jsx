@@ -19,48 +19,55 @@ const NavBtn = ({ v, children, view, setView, C }) => (
   </button>
 );
 
+// Silently fetch vehicle GPS coords from Velocity Fleet.
+// Returns { lat, lng } or null — never throws.
+async function fetchVehicleCoords(vehicleReg) {
+  if (!vehicleReg || String(vehicleReg).trim() === "") return null;
+  try {
+    const res = await api("getVehicleLocation", { reg: vehicleReg });
+    if (res.ok && res.lat && res.lng) return { lat: res.lat, lng: res.lng };
+  } catch { /* silent */ }
+  return null;
+}
+
 export default function MainApp({ session, onLogout }) {
   const C = useC();
   const { role, name, controllers, riders } = session;
 
-  // Available dashboards come from explicit flags; fall back to deriving them
-  // from `role` for any older session saved before the flags existed.
   const canControl = session.isController ?? (role === "controller" || role === "dual user");
-  const canRide    = session.isRider ?? (role === "rider" || role === "dual user");
-  const canAdmin   = session.isAdmin ?? (role === "admin");
+  const canRide    = session.isRider    ?? (role === "rider"       || role === "dual user");
+  const canAdmin   = session.isAdmin    ?? (role === "admin");
   const dashboards = [
     canControl && ["control", "CTL"],
-    canRide && ["rider", "RDR"],
-    canAdmin && ["admin", "ADM"],
+    canRide    && ["rider",   "RDR"],
+    canAdmin   && ["admin",   "ADM"],
   ].filter(Boolean);
-  // Default to control, then rider, then admin (pure admin lands in admin).
   const defaultDash = canControl ? "control" : canRide ? "rider" : "admin";
   const dashHome = (d) => (d === "control" ? "log" : d === "rider" ? "rider-list" : "admin-list");
 
-  const [dash, setDash] = useState(defaultDash);
-  const [view, setView] = useState(dashHome(defaultDash));
-  const [pendingDB, setPendingDB] = useState([]);
-  const [form, setForm] = useState({ ...EMPTY_CALL });
-  const [hospitals, setHospitals] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
-  const [meetups, setMeetups] = useState([]);
-  const [itemPicklist, setItems] = useState([]);
-
+  const [dash, setDash]               = useState(defaultDash);
+  const [view, setView]               = useState(dashHome(defaultDash));
+  const [pendingDB, setPendingDB]     = useState([]);
+  const [form, setForm]               = useState({ ...EMPTY_CALL });
+  const [hospitals,    setHospitals]    = useState([]);
+  const [vehicles,     setVehicles]     = useState([]);
+  const [meetups,      setMeetups]      = useState([]);
+  const [itemPicklist, setItems]        = useState([]);
   const [dutyStatuses, setDutyStatuses] = useState([]);
-  const [detailId, setDetailId] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [detailId,   setDetailId]   = useState(null);
+  const [toast,      setToast]      = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
-  const [dbLoading, setDbLoading] = useState(false);
+  const [dbLoading,  setDbLoading]  = useState(false);
 
   const notify = (msg, color = C.green) => { setToast({ msg, color }); setTimeout(() => setToast(null), 3000); };
   const selectedCall = pendingDB.find((x) => x.id === detailId) || null;
 
   useEffect(() => {
     api("getLists").then((res) => {
-      if (res.hospitals) setHospitals(res.hospitals);
-      if (res.items) setItems(res.items);
-      if (res.meetups) setMeetups(res.meetups);
-      if (res.vehicles) setVehicles(res.vehicles);
+      if (res.hospitals)    setHospitals(res.hospitals);
+      if (res.items)        setItems(res.items);
+      if (res.meetups)      setMeetups(res.meetups);
+      if (res.vehicles)     setVehicles(res.vehicles);
       if (res.dutyStatuses) setDutyStatuses(res.dutyStatuses);
     }).catch(() => {});
   }, []);
@@ -98,7 +105,8 @@ export default function MainApp({ session, onLogout }) {
   const onAddLocation = (v) => {
     setHospitals((p) => [...p, v].sort());
     api("addToList", { sheet: "OriginDestination", value: v }).catch(() => {});
-    notify(`"${v}" added`);  };
+    notify(`"${v}" added`);
+  };
 
   const onAddMeetup = (v) => {
     setMeetups((p) => [...p, v].sort());
@@ -123,9 +131,39 @@ export default function MainApp({ session, onLogout }) {
     catch { notify("Logged locally — sync error", C.orange); }
   };
 
-  const triggerPickup = (id) => { patchCall(id, { pickupTime: nowTime(), status: "in-transit" }); notify("Pickup recorded", C.accent); };
-  const triggerDropoff = (id) => { patchCall(id, { meetupTime: nowTime(), deliveryTime: nowTime(), status: "delivered" }); notify("Delivery recorded ✓"); };
-  const triggerRiderHome = (id) => { patchCall(id, { riderHome: nowTime() }); notify("Rider home recorded"); };
+  // Milestone triggers — capture vehicle GPS coords from Velocity Fleet if available
+  const triggerPickup = async (id) => {
+    const call = pendingDB.find((x) => x.id === id);
+    const patch = { pickupTime: nowTime(), status: "in-transit" };
+    if (call?.vehicleReg) {
+      const coords = await fetchVehicleCoords(call.vehicleReg);
+      if (coords) { patch.pickupLat = coords.lat; patch.pickupLng = coords.lng; }
+    }
+    patchCall(id, patch);
+    notify("Pickup recorded", C.accent);
+  };
+
+  const triggerDropoff = async (id) => {
+    const call = pendingDB.find((x) => x.id === id);
+    const patch = { meetupTime: nowTime(), deliveryTime: nowTime(), status: "delivered" };
+    if (call?.vehicleReg) {
+      const coords = await fetchVehicleCoords(call.vehicleReg);
+      if (coords) { patch.dropoffLat = coords.lat; patch.dropoffLng = coords.lng; }
+    }
+    patchCall(id, patch);
+    notify("Delivery recorded ✓");
+  };
+
+  const triggerRiderHome = async (id) => {
+    const call = pendingDB.find((x) => x.id === id);
+    const patch = { riderHome: nowTime() };
+    if (call?.vehicleReg) {
+      const coords = await fetchVehicleCoords(call.vehicleReg);
+      if (coords) { patch.riderHomeLat = coords.lat; patch.riderHomeLng = coords.lng; }
+    }
+    patchCall(id, patch);
+    notify("Rider home recorded");
+  };
 
   const completeMissing = (call) => COMPLETE_REQUIRED_FIELDS.filter((k) => !call[k] || (Array.isArray(call[k]) && !call[k].length));
 
@@ -148,7 +186,6 @@ export default function MainApp({ session, onLogout }) {
     catch { notify("Complete saved locally — sync error", C.orange); }
   };
 
-  // Complete a run directly from the controller log, optionally setting the vehicle on the spot.
   const completeFromLog = async (id, vehicleChoice) => {
     const call = pendingDB.find((x) => x.id === id); if (!call) return;
     const merged = { ...call, ...(vehicleChoice ? { vehicleUsed: vehicleChoice } : {}) };
@@ -162,25 +199,24 @@ export default function MainApp({ session, onLogout }) {
     catch { notify("Complete saved locally — sync error", C.orange); }
   };
 
-  const isControl = dash === "control";
+  const isControl   = dash === "control";
   const isAdminView = dash === "admin";
-  const hasHeaderActions = isControl || dashboards.length > 1; // is there a row-2 on mobile
+  const hasHeaderActions = isControl || dashboards.length > 1;
 
-  // A run is editable in the admin view only if this admin logged it.
-  const loggedByMe = (rc) => !!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone);
-
-  // Controller sees a run if they are the controller named on it (or logged it).
+  const loggedByMe  = (rc) => !!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone);
   const myControlRun = (rc) =>
-    (!!rc.controllerName && rc.controllerName.trim() === name.trim()) ||
+    (!!rc.controllerName  && rc.controllerName.trim() === name.trim()) ||
     (!!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone));
 
   const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
 
-  // Rider sees only runs where they were selected (active runs always have a rider).
   const isMyRun = (rc) => {
     const assigned = Array.isArray(rc.riders) ? rc.riders : typeof rc.riders === "string" ? [rc.riders] : [];
     return assigned.some((r) => r.trim() === name.trim());
   };
+
+  // Vehicle name list for dropdowns — vehicles may be [{name,reg}] or plain strings
+  const vehicleNames = vehicles.map((v) => (typeof v === "object" ? v.name : v));
 
   return (
     <div style={{ fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, display: "flex", flexDirection: "column" }}>
@@ -247,20 +283,21 @@ export default function MainApp({ session, onLogout }) {
       )}
 
       {isControl && view === "log" && (
-        <RunLog pending={pendingDB.filter(myControlRun)} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} onComplete={completeFromLog} vehicles={vehicles} />
+        <RunLog pending={pendingDB.filter(myControlRun)} onOpen={(id) => { setDetailId(id); setView("detail"); }} onNewCall={initiateNewCall} onComplete={completeFromLog} vehicles={vehicleNames} />
       )}
 
       {isControl && view === "newcall" && (
         <NewCallForm
           form={form} fset={fset} ftog={ftog}
-          lists={lists} onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
+          lists={{ ...lists, vehicles: vehicleNames }}
+          onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
           onSubmit={submitCall} onCancel={() => setView("log")}
         />
       )}
 
       {isControl && view === "detail" && selectedCall && (
         <CallDetail
-          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles} lists={lists}
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicleNames} lists={lists}
           confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
           markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("log")}
         />
@@ -290,7 +327,7 @@ export default function MainApp({ session, onLogout }) {
 
       {isAdminView && view === "admin-detail" && selectedCall && (
         <CallDetail
-          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicles} lists={lists}
+          sc={selectedCall} allCalls={pendingDB} patchField={patchField} notify={notify} vehicles={vehicleNames} lists={lists}
           confirmComplete={confirmComplete} setConfirmComplete={setConfirmComplete}
           markComplete={markComplete} onTryComplete={tryComplete} onBack={() => setView("admin-list")}
           readOnly={!loggedByMe(selectedCall)}
