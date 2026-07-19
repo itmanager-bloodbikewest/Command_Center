@@ -54,8 +54,14 @@ export const loadSession = () => {
     const raw = getCookie(SESSION_COOKIE);
     if (!raw) return null;
     const s = JSON.parse(raw);
-    if (!s || !s.role || !s.name) return null;
-    return s;
+    if (!s) return null;
+    // Normalise: Hub/Rota store user fields nested under s.user;
+    // CC stores them flat. Support both.
+    const name  = s.name  || s.user?.name;
+    const phone = s.phone || s.user?.phone;
+    const role  = s.role  || s.user?.role;
+    if (!role || !name) return null;
+    return { ...s, name, phone, role };
   } catch { return null; }
 };
 
