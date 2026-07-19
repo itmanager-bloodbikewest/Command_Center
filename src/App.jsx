@@ -7,35 +7,8 @@
 import { useState, useEffect } from "react";
 import { ThemeProvider, useC } from "./lib/theme.jsx";
 import { loadSession, clearSession, saveSession } from "./lib/session.js";
-import { api } from "./lib/api.js";
 import LoginScreen from "./components/LoginScreen.jsx";
 import MainApp from "./MainApp.jsx";
-
-async function registerPushNotifications(phone) {
-  try {
-    if (!("serviceWorker" in navigator) || !("Notification" in window)) return;
-    if (Notification.permission === "denied") return;
-    const reg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") return;
-    const { initializeApp, getApps } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-    const { getMessaging, getToken } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js");
-    const FIREBASE_CONFIG = {
-      apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
-      authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId:             import.meta.env.VITE_FIREBASE_APP_ID,
-    };
-    const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
-    const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
-    const messaging = getMessaging(app);
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
-    if (token) await api("saveFcmToken", { phone, token });
-  } catch (e) {
-    console.warn("Push notification setup failed:", e.message);
-  }
-}
 
 // Role selection screen — shown to dual users before entering the app.
 function RoleSelectScreen({ name, onSelect, onLogout }) {
@@ -79,7 +52,6 @@ function AppGate() {
       const saved = loadSession();
       if (saved && saved.role && saved.name) {
         setSession(saved);
-        if (saved.phone) registerPushNotifications(saved.phone).catch(() => {});
       } else {
         clearSession();
       }
@@ -92,7 +64,6 @@ function AppGate() {
   const handleLogin = (sess) => {
     saveSession(sess);
     setSession(sess);
-    if (sess.phone) registerPushNotifications(sess.phone).catch(() => {});
   };
 
   const handleLogout = () => {
