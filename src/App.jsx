@@ -101,7 +101,7 @@ const saveSession = (data, newToken) => {
       if (existing && existing.token) token = existing.token;
     } catch { /* ignore */ }
   }
-  const user = { name: data.name, phone: data.phone, role: data.role, controllers: data.controllers || [], riders: data.riders || [] };
+  const user = { name: data.name, phone: data.phone, role: data.role };
   setCookie(SESSION_COOKIE, JSON.stringify({ token, user, savedAt: Date.now() }), 30);
 };
 
