@@ -5,14 +5,24 @@ export default function RunLog({ pending, onOpen, onNewCall, onComplete, vehicle
   const C = useC();
   const empty = pending.length === 0;
   return (
-    <div style={{ flex: 1, padding: 16, overflowY: "auto" }}>
-      {empty ? (
-        <div style={{ textAlign: "center", paddingTop: 80 }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-          <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, letterSpacing: 2, color: C.muted }}>NO RUNS LOGGED TODAY</div>
-          {onNewCall && <div style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>Press <button onClick={onNewCall} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: C.accentText, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>+ NEW CALL</button> to begin</div>}
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+      {/* + NEW CALL button — centred at top of run log */}
+      {onNewCall && (
+        <div style={{ padding: "16px 16px 0", display: "flex", justifyContent: "center" }}>
+          <button onClick={onNewCall}
+            style={{ background: C.accent, border: "none", color: "#fff", padding: "14px 32px", borderRadius: 10, fontSize: 14, cursor: "pointer", fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", fontWeight: 700, letterSpacing: 0.5, boxShadow: `0 0 20px ${C.accent}44`, width: "100%", maxWidth: 400 }}>
+            + NEW CALL
+          </button>
         </div>
-      ) : <RunGroups active={pending} onOpen={onOpen} onComplete={onComplete} vehicles={vehicles} />}
+      )}
+      <div style={{ flex: 1, padding: 16, overflowY: "auto" }}>
+        {empty ? (
+          <div style={{ textAlign: "center", paddingTop: 60 }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+            <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, letterSpacing: 2, color: C.muted }}>NO ACTIVE RUNS</div>
+          </div>
+        ) : <RunGroups active={pending} onOpen={onOpen} onComplete={onComplete} vehicles={vehicles} />}
+      </div>
     </div>
   );
 }
