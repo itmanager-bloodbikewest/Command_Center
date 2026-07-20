@@ -53,7 +53,7 @@ export default function MainApp({ session, onLogout }) {
   const canControl = session.isController ?? (role === "controller" || role === "dual user");
   const canRide    = session.isRider    ?? (role === "rider"       || role === "dual user");
   const canAdmin   = session.isAdmin    ?? (role === "admin");
-  const isDual     = canControl && canRide;
+  const isDual     = session.isDualUser ?? (canControl && canRide);
 
   const dashboards = [
     canControl && ["control", "CTL"],

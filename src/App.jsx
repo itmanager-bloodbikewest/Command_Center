@@ -99,6 +99,7 @@ function AppGate() {
         isController: selectedDash === "control",
         isRider:      selectedDash === "rider",
         isAdmin:      false,
+        isDualUser:   true,
       }
     : {
         ...session,
