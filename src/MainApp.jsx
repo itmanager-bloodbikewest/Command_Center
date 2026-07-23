@@ -72,6 +72,8 @@ export default function MainApp({ session, onLogout }) {
   const [meetups,      setMeetups]      = useState([]);
   const [itemPicklist, setItems]        = useState([]);
   const [dutyStatuses, setDutyStatuses] = useState([]);
+  const [rosterCtrls,  setRosterCtrls]  = useState(session.controllers || []);
+  const [rosterRiders, setRosterRiders] = useState(session.riders || []);
   const [detailId,   setDetailId]   = useState(null);
   const [toast,      setToast]      = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
@@ -89,6 +91,13 @@ export default function MainApp({ session, onLogout }) {
       if (res.vehicles)     setVehicles(res.vehicles);
       if (res.dutyStatuses) setDutyStatuses(res.dutyStatuses);
     }).catch(() => {});
+    // Fetch controller/rider roster if not already in session
+    if (!session.controllers?.length || !session.riders?.length) {
+      api("getUserRole", { phone: session.phone }).then((res) => {
+        if (res.controllers) setRosterCtrls(res.controllers);
+        if (res.riders)      setRosterRiders(res.riders);
+      }).catch(() => {});
+    }
   }, []);
 
   const loadCalls = useCallback(async () => {
@@ -243,7 +252,7 @@ export default function MainApp({ session, onLogout }) {
     (!!rc.controllerName  && rc.controllerName.trim() === name.trim()) ||
     (!!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone));
 
-  const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
+  const lists = { controllers: rosterCtrls, riders: rosterRiders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
 
   const isMyRun = (rc) => {
     const assigned = Array.isArray(rc.riders) ? rc.riders : typeof rc.riders === "string" ? [rc.riders] : [];
