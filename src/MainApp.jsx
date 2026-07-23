@@ -30,6 +30,22 @@ async function fetchVehicleCoords(vehicleReg) {
   return null;
 }
 
+// Switch role warning dialog — shown when DU switches while on newcall view.
+function SwitchWarning({ targetLabel, onConfirm, onCancel, C }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 12, padding: 28, maxWidth: 360, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 10, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>Switch to {targetLabel}?</div>
+        <div style={{ fontSize: 13, color: C.muted, marginBottom: 24, lineHeight: 1.6 }}>You're in the middle of logging a call. Switching role will discard this call.</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onConfirm} style={{ flex: 1, background: C.orange, border: "none", color: "#000", padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700 }}>SWITCH & DISCARD</button>
+          <button onClick={onCancel} style={{ flex: 1, background: "none", border: `1px solid ${C.borderHi}`, color: C.muted, padding: "11px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace" }}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MainApp({ session, onLogout }) {
   const C = useC();
   const { role, name, controllers, riders } = session;
@@ -37,6 +53,8 @@ export default function MainApp({ session, onLogout }) {
   const canControl = session.isController ?? (role === "controller" || role === "dual user");
   const canRide    = session.isRider    ?? (role === "rider"       || role === "dual user");
   const canAdmin   = session.isAdmin    ?? (role === "admin");
+  const isDual     = session.isDualUser ?? (canControl && canRide);
+
   const dashboards = [
     canControl && ["control", "CTL"],
     canRide    && ["rider",   "RDR"],
@@ -54,10 +72,13 @@ export default function MainApp({ session, onLogout }) {
   const [meetups,      setMeetups]      = useState([]);
   const [itemPicklist, setItems]        = useState([]);
   const [dutyStatuses, setDutyStatuses] = useState([]);
+  const [rosterCtrls,  setRosterCtrls]  = useState(session.controllers || []);
+  const [rosterRiders, setRosterRiders] = useState(session.riders || []);
   const [detailId,   setDetailId]   = useState(null);
   const [toast,      setToast]      = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [dbLoading,  setDbLoading]  = useState(false);
+  const [switchTarget, setSwitchTarget] = useState(null); // pending dash switch for DU warning
 
   const notify = (msg, color = C.green) => { setToast({ msg, color }); setTimeout(() => setToast(null), 3000); };
   const selectedCall = pendingDB.find((x) => x.id === detailId) || null;
@@ -70,6 +91,13 @@ export default function MainApp({ session, onLogout }) {
       if (res.vehicles)     setVehicles(res.vehicles);
       if (res.dutyStatuses) setDutyStatuses(res.dutyStatuses);
     }).catch(() => {});
+    // Fetch controller/rider roster if not already in session
+    if (!session.controllers?.length || !session.riders?.length) {
+      api("getUserRole", { phone: session.phone }).then((res) => {
+        if (res.controllers) setRosterCtrls(res.controllers);
+        if (res.riders)      setRosterRiders(res.riders);
+      }).catch(() => {});
+    }
   }, []);
 
   const loadCalls = useCallback(async () => {
@@ -199,24 +227,43 @@ export default function MainApp({ session, onLogout }) {
     catch { notify("Complete saved locally — sync error", C.orange); }
   };
 
+  // Dual user role switch — warn if mid-form, otherwise switch immediately
+  const handleDashSwitch = (targetDash) => {
+    if (targetDash === dash) return;
+    if (view === "newcall") {
+      setSwitchTarget(targetDash);
+    } else {
+      setDash(targetDash);
+      setView(dashHome(targetDash));
+    }
+  };
+
+  const confirmSwitch = () => {
+    setDash(switchTarget);
+    setView(dashHome(switchTarget));
+    setSwitchTarget(null);
+  };
+
   const isControl   = dash === "control";
   const isAdminView = dash === "admin";
-  const hasHeaderActions = isControl || dashboards.length > 1;
 
   const loggedByMe  = (rc) => !!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone);
   const myControlRun = (rc) =>
     (!!rc.controllerName  && rc.controllerName.trim() === name.trim()) ||
     (!!rc.controllerPhone && normalizePhone(rc.controllerPhone) === normalizePhone(session.phone));
 
-  const lists = { controllers, riders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
+  const lists = { controllers: rosterCtrls, riders: rosterRiders, hospitals, vehicles, meetups, itemPicklist, dutyStatuses };
 
   const isMyRun = (rc) => {
     const assigned = Array.isArray(rc.riders) ? rc.riders : typeof rc.riders === "string" ? [rc.riders] : [];
     return assigned.some((r) => r.trim() === name.trim());
   };
 
-  // Vehicle name list for dropdowns — vehicles may be [{name,reg}] or plain strings
   const vehicleNames = vehicles.map((v) => (typeof v === "object" ? v.name : v));
+
+  // Switch button label for dual users
+  const switchLabel  = isControl ? "Switch to Rider" : "Switch to Controller";
+  const switchTarget_ = isControl ? "rider" : "control";
 
   return (
     <div style={{ fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, display: "flex", flexDirection: "column" }}>
@@ -224,22 +271,27 @@ export default function MainApp({ session, onLogout }) {
       <style>{`
         .bbw-header{display:flex;align-items:center;gap:8px;height:56px;padding:0 16px;flex-shrink:0}
         .bbw-brand{order:0;margin-right:auto}
-        .bbw-newcall{order:1}
-        .bbw-toggle{order:2}
-        .bbw-account{order:3}
+        .bbw-account{order:1}
         .bbw-break{display:none;order:2}
         @media (max-width:520px){
           .bbw-header{height:auto;flex-wrap:wrap;row-gap:8px;padding-top:8px;padding-bottom:8px}
           .bbw-brand{order:1;margin-right:auto}
           .bbw-account{order:2}
           .bbw-break{display:block;order:3;flex-basis:100%;height:0;margin:0}
-          .bbw-newcall{order:4}
-          .bbw-toggle{order:5}
           .bbw-brand-title{font-size:11px;letter-spacing:1px}
         }
       `}</style>
 
       {toast && <div role="alert" style={{ position: "fixed", top: 16, right: 16, background: toast.color, color: "#fff", padding: "10px 20px", borderRadius: 7, fontSize: 13, zIndex: 9999, boxShadow: "0 4px 24px rgba(0,0,0,0.3)", fontFamily: "'IBM Plex Mono',monospace", whiteSpace: "pre-line", maxWidth: 300, lineHeight: 1.6 }}>{toast.msg}</div>}
+
+      {switchTarget && (
+        <SwitchWarning
+          targetLabel={switchTarget === "control" ? "Controller" : "Rider"}
+          onConfirm={confirmSwitch}
+          onCancel={() => setSwitchTarget(null)}
+          C={C}
+        />
+      )}
 
       <InstallPrompt />
 
@@ -253,25 +305,18 @@ export default function MainApp({ session, onLogout }) {
           </div>
         </div>
 
-        <div className="bbw-account" style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 11, color: C.text, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-          <button onClick={() => { clearSession(); onLogout(); }} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: "5px 12px", borderRadius: 6, letterSpacing: 1, marginTop: 4 }}>SIGN OUT</button>
-        </div>
-
-        {hasHeaderActions && <div className="bbw-break" />}
-
-        {isControl && <button className="bbw-newcall" onClick={initiateNewCall} style={{ background: C.accent, border: "none", color: "#fff", padding: "8px 14px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>+ NEW CALL</button>}
-
-        {dashboards.length > 1 && (
-          <div className="bbw-toggle" style={{ display: "flex", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 3, gap: 3, flexShrink: 0 }}>
-            {dashboards.map(([d, label]) => (
-              <button key={d} onClick={() => { setDash(d); setView(dashHome(d)); }}
-                style={{ background: dash === d ? C.accent : "transparent", color: dash === d ? "#fff" : C.muted, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", letterSpacing: 1, fontWeight: 600 }}>
-                {label}
-              </button>
-            ))}
+        <div className="bbw-account" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {isDual && (
+            <button onClick={() => handleDashSwitch(switchTarget_)}
+              style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.text, fontSize: 11, cursor: "pointer", fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif", fontWeight: 600, padding: "6px 12px", borderRadius: 6 }}>
+              {switchLabel}
+            </button>
+          )}
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: C.text, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+            <button onClick={() => { clearSession(); onLogout(); }} style={{ background: C.card, border: `1px solid ${C.borderHi}`, color: C.muted, fontSize: 10, cursor: "pointer", fontFamily: "'IBM Plex Mono',monospace", padding: "5px 12px", borderRadius: 6, letterSpacing: 1, marginTop: 4 }}>SIGN OUT</button>
           </div>
-        )}
+        </div>
       </header>
 
       {/* Control sub-nav */}
@@ -289,7 +334,7 @@ export default function MainApp({ session, onLogout }) {
       {isControl && view === "newcall" && (
         <NewCallForm
           form={form} fset={fset} ftog={ftog}
-          lists={{ ...lists, vehicles: vehicleNames }}
+          lists={{ ...lists, vehicles: vehicleNames, vehicleObjects: vehicles }}
           onAddLocation={onAddLocation} onAddMeetup={onAddMeetup}
           onSubmit={submitCall} onCancel={() => setView("log")}
         />

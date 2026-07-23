@@ -1,31 +1,69 @@
 import { useState } from "react";
-import { useC } from "../lib/theme.jsx";
+import { useC, isDark } from "../lib/theme.jsx";
 import { Label, inp } from "../ui/primitives.jsx";
-import { isDark } from "../lib/theme.jsx";
 import { api } from "../lib/api.js";
 import { normalizePhone, saveSession } from "../lib/session.js";
 
+const ROTA_URL = import.meta.env.VITE_ROTA_APPS_SCRIPT_URL;
+
+// Call Rota's Apps Script login action (phone + password → token + user).
+async function rotaLogin(phone, password) {
+  const url = new URL(ROTA_URL);
+  url.searchParams.set("action", "login");
+  url.searchParams.set("data", JSON.stringify({ phone, password }));
+  const res = await fetch(url.toString(), { method: "GET", redirect: "follow" });
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch { throw new Error("Invalid response from auth server"); }
+}
+
 export default function LoginScreen({ onLogin }) {
   const C = useC();
-  const [phone, setPhone] = useState("");
-  const [errMsg, setErrMsg] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [phone,    setPhone]    = useState("");
+  const [password, setPassword] = useState("");
+  const [errMsg,   setErrMsg]   = useState("");
+  const [loading,  setLoading]  = useState(false);
 
   const handleLogin = async () => {
     const normalized = normalizePhone(phone);
-    if (!normalized) { setErrMsg("Please enter your phone number."); return; }
+    if (!normalized)    { setErrMsg("Please enter your phone number."); return; }
+    if (!password.trim()) { setErrMsg("Please enter your password.");     return; }
     setLoading(true); setErrMsg("");
     try {
-      const res = await api("getUserRole", { phone: normalized });
-      if (!res.found) { setErrMsg("Phone number not recognised. Please contact your administrator."); setLoading(false); return; }
-      const session = { phone: normalized, role: res.role, name: res.name, controllers: res.controllers || [], riders: res.riders || [], isController: !!res.isController, isRider: !!res.isRider, isAdmin: !!res.isAdmin };
+      // Step 1 — authenticate via Rota's backend (password check + token)
+      const auth = await rotaLogin(normalized, password.trim());
+      if (!auth.success) {
+        setErrMsg(auth.message || "Incorrect phone number or password.");
+        setLoading(false); return;
+      }
+
+      // Step 2 — get CC role + roster data from CC's own backend
+      const roleRes = await api("getUserRole", { phone: normalized });
+      if (!roleRes.found) {
+        setErrMsg("Authenticated but no Command Centre role found. Contact your administrator.");
+        setLoading(false); return;
+      }
+
+      // Step 3 — build session and write shared cookie
+      const session = {
+        phone:        normalized,
+        name:         roleRes.name  || auth.user?.name || normalized,
+        role:         roleRes.role,
+        token:        auth.token    || null,
+        isController: !!roleRes.isController,
+        isRider:      !!roleRes.isRider,
+        isAdmin:      !!roleRes.isAdmin,
+        // controllers/riders intentionally omitted — fetched at runtime
+      };
       saveSession(session);
       onLogin(session);
-    } catch {
+    } catch (e) {
       setErrMsg("Could not connect to server. Please try again.");
     }
     setLoading(false);
   };
+
+  const onKey = (e) => { if (e.key === "Enter") handleLogin(); };
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Atkinson Hyperlegible','IBM Plex Sans',sans-serif" }}>
@@ -36,15 +74,34 @@ export default function LoginScreen({ onLogin }) {
         <div style={{ fontSize: 10, color: C.muted, letterSpacing: 4, marginTop: 2 }}>COMMAND CENTRE</div>
       </div>
       <div style={{ background: C.card, border: `1px solid ${C.borderHi}`, borderRadius: 12, padding: 32, width: "100%", maxWidth: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
-        <div style={{ fontSize: 13, color: C.muted, marginBottom: 24, lineHeight: 1.7, textAlign: "center" }}>Enter your phone number to sign in.</div>
-        {errMsg && <div role="alert" style={{ background: C.errorBg, border: `1px solid ${C.red}`, borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.errorText }}>{errMsg}</div>}
-        <Label>Phone Number</Label>
-        <input type="tel" aria-label="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="e.g. 087 123 4567" style={{ ...inp(C), width: "100%", marginBottom: 14, fontSize: 15 }} />
-        <button onClick={handleLogin} disabled={loading} style={{ width: "100%", background: loading ? (isDark(C) ? "#1a2a4a" : "#9ab0e8") : C.accent, border: "none", color: "#fff", padding: "13px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1 }}>
+        <div style={{ fontSize: 13, color: C.muted, marginBottom: 24, lineHeight: 1.7, textAlign: "center" }}>
+          Sign in with your Blood Bike West credentials.
+        </div>
+        {errMsg && (
+          <div role="alert" style={{ background: C.errorBg, border: `1px solid ${C.red}`, borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.errorText }}>
+            {errMsg}
+          </div>
+        )}
+        <div style={{ marginBottom: 14 }}>
+          <Label>Phone number</Label>
+          <input type="tel" aria-label="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)}
+            onKeyDown={onKey} placeholder="e.g. 087 123 4567"
+            style={{ ...inp(C), width: "100%", fontSize: 15 }} />
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <Label>Password</Label>
+          <input type="password" aria-label="Password" value={password} onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={onKey} placeholder="Your team password"
+            style={{ ...inp(C), width: "100%", fontSize: 15 }} />
+        </div>
+        <button onClick={handleLogin} disabled={loading}
+          style={{ width: "100%", background: loading ? (isDark(C) ? "#1a2a4a" : "#9ab0e8") : C.accent, border: "none", color: "#fff", padding: "13px", borderRadius: 8, fontSize: 13, cursor: loading ? "default" : "pointer", fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1 }}>
           {loading ? "CHECKING…" : "SIGN IN"}
         </button>
       </div>
-      <div style={{ marginTop: 20, fontSize: 11, color: C.muted, textAlign: "center" }}>Not registered? Contact your Blood Bike West administrator.</div>
+      <div style={{ marginTop: 20, fontSize: 11, color: C.muted, textAlign: "center" }}>
+        Not registered? Contact your Blood Bike West administrator.
+      </div>
     </div>
   );
 }
