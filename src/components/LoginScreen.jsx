@@ -7,10 +7,13 @@ import { normalizePhone, saveSession } from "../lib/session.js";
 const ROTA_URL = import.meta.env.VITE_ROTA_APPS_SCRIPT_URL;
 
 // Call Rota's Apps Script login action (phone + password → token + user).
+// Rota expects flat GET params: action=login&phone=...&password=...&env=...
 async function rotaLogin(phone, password) {
   const url = new URL(ROTA_URL);
   url.searchParams.set("action", "login");
-  url.searchParams.set("data", JSON.stringify({ phone, password }));
+  url.searchParams.set("phone", phone);
+  url.searchParams.set("password", password);
+  url.searchParams.set("env", window.location.hostname.startsWith("dev.") ? "dev" : "prod");
   const res = await fetch(url.toString(), { method: "GET", redirect: "follow" });
   const text = await res.text();
   try { return JSON.parse(text); }
