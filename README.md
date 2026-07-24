@@ -6,7 +6,7 @@ runs and record pickup/dropoff/home times. Data is stored in Google Sheets via a
 Google Apps Script web app; push notifications use Firebase Cloud Messaging.
 
 ## Tech stack
-
+ 
 - React 19 + Vite
 - Google Apps Script backend (Google Sheets as the data store)
 - Firebase Cloud Messaging (push notifications)
