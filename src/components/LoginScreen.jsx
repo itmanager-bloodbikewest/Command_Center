@@ -34,9 +34,10 @@ export default function LoginScreen({ onLogin }) {
     setLoading(true); setErrMsg("");
     try {
       // Step 1 — authenticate via Rota's backend (password check + token)
+      // Rota returns { token, user } on success, or throws on failure
       const auth = await rotaLogin(normalized, password.trim());
-      if (!auth.success) {
-        setErrMsg(auth.message || "Incorrect phone number or password.");
+      if (!auth.token || !auth.user) {
+        setErrMsg(auth.error || auth.message || "Incorrect phone number or password.");
         setLoading(false); return;
       }
 
@@ -50,7 +51,7 @@ export default function LoginScreen({ onLogin }) {
       // Step 3 — build session and write shared cookie
       const session = {
         phone:        normalized,
-        name:         roleRes.name  || auth.user?.name || normalized,
+        name:         roleRes.name  || auth.user?.name || auth.user?.phone || normalized,
         role:         roleRes.role,
         token:        auth.token    || null,
         isController: !!roleRes.isController,
